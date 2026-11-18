@@ -1,0 +1,185 @@
+name = "grosshandel"
+main = "src/index.ts"
+compatibility_date = "2025-01-09"
+compatibility_flags = ["nodejs_compat"]
+
+# Per build-plan G2: D1-Region weur (West Europe)
+# Per build-plan G1: Single-Worker (kein Monorepo) — alle Routes hier
+
+[vars]
+WORKER_VERSION = "0.1.0"
+ENVIRONMENT = "development"
+
+# D1 — geteilt, tenant_id auf jeder Tabelle (Stack-Decision: tenancy)
+[[d1_databases]]
+binding = "DB"
+database_name = "grosshandel"
+database_id = "00000000-0000-0000-0000-000000000000"  # placeholder — überschreiben pro Env
+migrations_dir = "migrations"
+
+# KV — VIES-Cache, Idempotency-Layer, Rate-Limit-Buckets
+[[kv_namespaces]]
+binding = "KV"
+id = "0000000000000000000000000000000000"  # placeholder
+
+# R2 — Produkt-Bilder, Invoice-PDFs, Backups
+[[r2_buckets]]
+binding = "ASSETS"
+bucket_name = "grosshandel-assets"
+
+# Queue — Outbox / Webhook-Delivery / Push-Delivery
+[[queues.producers]]
+binding = "OUTBOX_QUEUE"
+queue = "grosshandel-outbox"
+
+[[queues.consumers]]
+queue = "grosshandel-outbox"
+max_batch_size = 10
+max_batch_timeout = 30
+max_retries = 3
+dead_letter_queue = "grosshandel-outbox-dlq"
+
+# Durable Objects — Stock per (tenant, warehouse, sku) + Cron-Lock (M17) + Rate-Limiter (M15, später)
+[[durable_objects.bindings]]
+name = "STOCK_DO"
+class_name = "StockDO"
+
+[[durable_objects.bindings]]
+name = "CRON_LOCK_DO"
+class_name = "CronLockDO"
+
+[[durable_objects.bindings]]
+name = "INVOICE_NUMBER_DO"
+class_name = "InvoiceNumberDO"
+
+[[durable_objects.bindings]]
+name = "RATE_LIMIT_DO"
+class_name = "RateLimitDO"
+
+[[durable_objects.bindings]]
+name = "RETURNS_DO"
+class_name = "ReturnsDO"
+
+[[migrations]]
+tag = "v1"
+new_classes = ["StockDO", "CronLockDO"]
+
+[[migrations]]
+tag = "v2"
+new_classes = ["InvoiceNumberDO", "RateLimitDO"]
+
+[[migrations]]
+tag = "v3"
+new_sqlite_classes = ["ReturnsDO"]
+
+# Cron-Triggers (M17). Heartbeat alle 15min als Smoke. Domain-Jobs registrieren sich
+# in M12/M16/M20/M21 und ergänzen die Liste hier.
+[triggers]
+# `*/5` = outbox-sweep (war jede Minute, #C-005); `0 *` = backup hourly (#C-007);
+# `15 */6` = idempotency-cleanup (#I-001).
+crons = ["*/5 * * * *", "*/15 * * * *", "0 * * * *", "0 3 * * *", "30 3 * * *", "0 5 * * *", "15 */6 * * *", "7,22,37,52 * * * *"]
+
+[observability]
+enabled = true
+
+# Logpush placeholder for M18 (Logpush wird via dashboard/api konfiguriert)
+
+# Environment-Overrides — per-env D1/KV/R2 IDs MUST be set before deploy (#W-001).
+# Lokal/dev verwenden den Top-Level-Block oben; staging/prod überschreiben hier.
+
+[env.staging]
+# `vars` erbt NICHT vom Top-Level — WORKER_VERSION muss hier mit stehen.
+vars = { ENVIRONMENT = "staging", WORKER_VERSION = "0.1.0" }
+
+[[env.staging.d1_databases]]
+binding = "DB"
+database_name = "grosshandel-staging"
+database_id = "18beea68-2d6e-4608-8b5c-59d2fe16d4b7"  # grosshandel-staging (weur), angelegt 2026-11-17
+migrations_dir = "migrations"
+
+[[env.staging.kv_namespaces]]
+binding = "KV"
+id = "2966dd7c8bfb4f7b9f30149ee5178e7a"  # grosshandel-kv-staging, angelegt 2026-11-17
+
+# Login-Codes per Cloudflare Email Service. Absender = Worker-Variable MAIL_FROM
+# (nicht im Repo); deren Domain muss für Email Sending freigeschaltet sein.
+[[env.staging.send_email]]
+name = "EMAIL"
+
+[[env.staging.r2_buckets]]
+binding = "ASSETS"
+bucket_name = "grosshandel-assets-staging"
+
+[[env.staging.queues.producers]]
+binding = "OUTBOX_QUEUE"
+queue = "grosshandel-outbox-staging"
+
+[[env.staging.queues.consumers]]
+queue = "grosshandel-outbox-staging"
+max_batch_size = 10
+max_batch_timeout = 30
+max_retries = 3
+dead_letter_queue = "grosshandel-outbox-staging-dlq"
+
+[[env.staging.durable_objects.bindings]]
+name = "STOCK_DO"
+class_name = "StockDO"
+[[env.staging.durable_objects.bindings]]
+name = "CRON_LOCK_DO"
+class_name = "CronLockDO"
+[[env.staging.durable_objects.bindings]]
+name = "INVOICE_NUMBER_DO"
+class_name = "InvoiceNumberDO"
+[[env.staging.durable_objects.bindings]]
+name = "RATE_LIMIT_DO"
+class_name = "RateLimitDO"
+[[env.staging.durable_objects.bindings]]
+name = "RETURNS_DO"
+class_name = "ReturnsDO"
+
+[env.production]
+vars = { ENVIRONMENT = "production", WORKER_VERSION = "0.1.0" }
+
+[[env.production.d1_databases]]
+binding = "DB"
+database_name = "grosshandel-prod"
+database_id = "00000000-0000-0000-0000-000000000000"  # MUST replace before prod-deploy
+migrations_dir = "migrations"
+
+[[env.production.kv_namespaces]]
+binding = "KV"
+id = "0000000000000000000000000000000000"  # MUST replace before prod-deploy
+
+[[env.production.send_email]]
+name = "EMAIL"
+
+[[env.production.r2_buckets]]
+binding = "ASSETS"
+bucket_name = "grosshandel-assets-prod"
+
+[[env.production.queues.producers]]
+binding = "OUTBOX_QUEUE"
+queue = "grosshandel-outbox-prod"
+
+[[env.production.queues.consumers]]
+queue = "grosshandel-outbox-prod"
+max_batch_size = 10
+max_batch_timeout = 30
+max_retries = 3
+dead_letter_queue = "grosshandel-outbox-prod-dlq"
+
+[[env.production.durable_objects.bindings]]
+name = "STOCK_DO"
+class_name = "StockDO"
+[[env.production.durable_objects.bindings]]
+name = "CRON_LOCK_DO"
+class_name = "CronLockDO"
+[[env.production.durable_objects.bindings]]
+name = "INVOICE_NUMBER_DO"
+class_name = "InvoiceNumberDO"
+[[env.production.durable_objects.bindings]]
+name = "RATE_LIMIT_DO"
+class_name = "RateLimitDO"
+[[env.production.durable_objects.bindings]]
+name = "RETURNS_DO"
+class_name = "ReturnsDO"

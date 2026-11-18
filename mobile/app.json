@@ -1,0 +1,22 @@
+{
+  "expo": {
+    "name": "Grosshandel",
+    "slug": "grosshandel-pilot",
+    "scheme": "grosshandel-pilot",
+    "version": "0.1.0",
+    "orientation": "portrait",
+    "plugins": [
+      "expo-router",
+      "expo-secure-store"
+    ],
+    "web": {
+      "bundler": "metro"
+    },
+    "ios": {
+      "bundleIdentifier": "app.grosshandel.pilot"
+    },
+    "android": {
+      "package": "app.grosshandel.pilot"
+    }
+  }
+}

@@ -1,0 +1,13 @@
+{
+  "$schema": "https://errors.grosshandel.app/schemas/dashboard/1.0.json",
+  "version": "1.0",
+  "title": "Grosshandel — API Health",
+  "panels": [
+    { "id": "rps", "type": "timeseries", "metric": "http.requests", "group_by": ["status_class"], "window": "1h", "step": "1m" },
+    { "id": "p50_p95_p99", "type": "timeseries", "metric": "http.duration_ms", "aggregations": ["p50", "p95", "p99"], "group_by": ["route"], "window": "6h", "step": "5m" },
+    { "id": "error_rate_by_code", "type": "timeseries", "metric": "http.requests", "filter": "error_code != ''", "group_by": ["error_code"], "window": "6h", "step": "5m" },
+    { "id": "auth_failure_rate", "type": "timeseries", "metric": "http.requests", "filter": "error_code matches GH-AUTH-*", "group_by": ["error_code", "tenant_id"], "window": "6h", "step": "5m" },
+    { "id": "idempotency_hit_rate", "type": "stat", "metric": "http.requests", "filter": "idempotency_hit = true", "window": "1h" },
+    { "id": "slo_availability_burn", "type": "stat", "expression": "1 - (sum(http.requests where status >= 500) / sum(http.requests))", "window": "30d", "target": 0.999 }
+  ]
+}

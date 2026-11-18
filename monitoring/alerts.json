@@ -1,0 +1,75 @@
+{
+  "$schema": "https://errors.grosshandel.app/schemas/alerts/1.0.json",
+  "version": "1.0",
+  "description": "Alert-Definitionen — Quelle für CF-Notifications + Workers-Analytics-Engine-Queries. Kalibriert gegen src/observability/slos.ts.",
+  "alerts": [
+    {
+      "id": "api_availability_burn_critical",
+      "slo_ref": "api_availability_30d",
+      "severity": "critical",
+      "condition": "burn_rate(1h) > 14.4",
+      "channels": ["pagerduty", "ops-channel"],
+      "runbook": "docs/runbooks/api-availability-burn.md"
+    },
+    {
+      "id": "api_availability_burn_warning",
+      "slo_ref": "api_availability_30d",
+      "severity": "warning",
+      "condition": "burn_rate(6h) > 1",
+      "channels": ["ops-channel"],
+      "runbook": "docs/runbooks/api-availability-burn.md"
+    },
+    {
+      "id": "p99_latency_breach",
+      "slo_ref": "api_p99_latency",
+      "severity": "warning",
+      "condition": "p99(http.duration_ms over 30m for /v1/orders/*) > 500",
+      "channels": ["ops-channel"],
+      "runbook": "docs/runbooks/p99-latency-breach.md"
+    },
+    {
+      "id": "stock_reserve_p99_breach",
+      "slo_ref": "stock_reserve_p99",
+      "severity": "warning",
+      "condition": "p99(stock.reserve.duration_ms over 30m) > 100",
+      "channels": ["ops-channel"],
+      "runbook": "docs/runbooks/stock-reserve-latency.md"
+    },
+    {
+      "id": "webhook_delivery_lag",
+      "slo_ref": "webhook_delivery_within_1h",
+      "severity": "warning",
+      "condition": "max(outbox.lag_seconds over 5m) > 3600",
+      "channels": ["ops-channel"],
+      "runbook": "docs/runbooks/webhook-delivery-lag.md"
+    },
+    {
+      "id": "auth_failure_spike",
+      "severity": "warning",
+      "condition": "rate(GH-AUTH-* per tenant_id over 5m) > 10x baseline",
+      "channels": ["security-channel"],
+      "runbook": "docs/runbooks/auth-failure-spike.md"
+    },
+    {
+      "id": "cron_job_paused",
+      "severity": "warning",
+      "condition": "any cron_job_state.paused = true",
+      "channels": ["ops-channel"],
+      "runbook": "docs/runbooks/cron-job-paused.md"
+    },
+    {
+      "id": "backup_snapshot_failed",
+      "severity": "critical",
+      "condition": "sum(backup.daily.failed over 2h) > 0",
+      "channels": ["pagerduty", "ops-channel"],
+      "runbook": "docs/runbooks/disaster-restore.md"
+    },
+    {
+      "id": "rate_limit_fail_open",
+      "severity": "warning",
+      "condition": "presence of X-Idempotency-Warning=kv_unavailable in last 5m",
+      "channels": ["ops-channel"],
+      "runbook": "docs/runbooks/kv-unavailable.md"
+    }
+  ]
+}

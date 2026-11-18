@@ -1,0 +1,14 @@
+{
+  "$schema": "https://errors.grosshandel.app/schemas/dashboard/1.0.json",
+  "version": "1.0",
+  "title": "Grosshandel — Per-Tenant Health",
+  "filter_required": ["tenant_id"],
+  "panels": [
+    { "id": "rps", "type": "timeseries", "metric": "http.requests", "group_by": ["route"], "window": "6h", "step": "5m" },
+    { "id": "stock_reserve_latency", "type": "timeseries", "metric": "stock.reserve.duration_ms", "aggregations": ["p50", "p99"], "window": "6h", "step": "5m" },
+    { "id": "webhook_delivery_success", "type": "stat", "metric": "webhook.delivery", "filter": "status = delivered", "window": "1h" },
+    { "id": "outbox_backlog", "type": "stat", "expression": "max(outbox.lag_seconds)", "window": "5m" },
+    { "id": "open_orders_by_state", "type": "stat", "metric": "orders.gauge", "group_by": ["state"], "window": "now" },
+    { "id": "auth_failures", "type": "timeseries", "metric": "http.requests", "filter": "error_code matches GH-AUTH-*", "group_by": ["error_code"], "window": "24h", "step": "1h" }
+  ]
+}

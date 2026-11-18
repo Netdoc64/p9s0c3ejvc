@@ -1,0 +1,129 @@
+name: CI
+
+on:
+  pull_request:
+    branches: [main]
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+# WO ER LÄUFT: auf GitHub-Runnern (`ubuntu-latest`), in einem öffentlichen
+# Repo kostenlos. KEIN eigener Runner: in einem öffentlichen Repo kann jeder
+# eine PR aus einem Fork öffnen, und deren Code liefe sonst auf eigener
+# Hardware.
+#
+# Actions sind auf Commit-SHAs gepinnt (Semgrep: mutable action tag). Der
+# Kommentar dahinter nennt die Fassung; beim Anheben beides ändern.
+
+jobs:
+  build-and-test:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
+        with:
+          fetch-depth: 0
+
+      # Öffentliches Repo: Autor, Committer und Co-authored-by nur mit noreply,
+      # für alle Commits der PR. Den Autor des Squash-Commits auf main legt
+      # GitHub beim Merge fest (primäre Adresse des PR-Autors). Den sichert nur
+      # dessen Kontoeinstellung „Keep my email addresses private“.
+      - name: Commit-Identität (noreply)
+        if: github.event_name == 'pull_request'
+        env:
+          BEREICH: ${{ github.event.pull_request.base.sha }}..${{ github.event.pull_request.head.sha }}
+        run: node scripts/check-commit-identity.mjs "$BEREICH"
+
+      # pnpm-Version kommt aus package.json `packageManager`-Feld (single source of truth).
+      - uses: pnpm/action-setup@b906affcce14559ad1aafd4ab0e942779e9f58b1 # v4.3.0
+
+      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4.4.0
+        with:
+          node-version: 22
+          cache: pnpm
+
+      - name: Install
+        run: pnpm install --frozen-lockfile
+
+      - name: Generate Cloudflare types
+        run: pnpm cf-typegen
+        continue-on-error: true
+
+      - name: Typecheck
+        run: pnpm typecheck
+
+      - name: Test
+        run: pnpm test
+
+      - name: Build (dry-run)
+        run: pnpm build
+
+  audit:
+    name: Dependency-Audit
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
+
+      # pnpm-Version kommt aus package.json `packageManager`-Feld (single source of truth).
+      - uses: pnpm/action-setup@b906affcce14559ad1aafd4ab0e942779e9f58b1 # v4.3.0
+
+      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4.4.0
+        with:
+          node-version: 22
+          cache: pnpm
+
+      - name: Install
+        run: pnpm install --frozen-lockfile
+
+      - name: pnpm audit (high+critical only, prod deps)
+        run: pnpm audit --prod --audit-level=high
+
+      - name: pnpm audit (dev deps, warn-only)
+        # #W-003: Dev-Deps werden geprüft aber failed nicht den Build (CI/build-tools).
+        run: pnpm audit --dev --audit-level=high
+        continue-on-error: true
+
+  secret-scan:
+    name: Secret-Scan
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    # gitleaks-action braucht read-Permission auf PR-Commits.
+    permissions:
+      contents: read
+      pull-requests: read
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
+        with:
+          fetch-depth: 0
+
+      - name: gitleaks
+        uses: gitleaks/gitleaks-action@ff98106e4c7b2bc287b24eaf42907196329070c7 # v2.3.9
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        continue-on-error: false
+
+  semgrep:
+    name: Semgrep SAST
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    if: github.event_name == 'pull_request' || github.ref == 'refs/heads/main'
+    # Semgrep als Python-Paket statt `container: semgrep/semgrep:latest`:
+    # ein Image-Tag wie `latest` ist so veränderlich wie ein Action-Tag.
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
+
+      - uses: actions/setup-python@a26af69be951a213d495a4c3e4e4022e16d87065 # v5.6.0
+        with:
+          python-version: "3.12"
+
+      - name: Install semgrep
+        run: |
+          python -m venv "$RUNNER_TEMP/semgrep-venv"
+          "$RUNNER_TEMP/semgrep-venv/bin/pip" install --quiet semgrep
+          echo "$RUNNER_TEMP/semgrep-venv/bin" >> "$GITHUB_PATH"
+
+      # #W-002: Audit-Findings müssen CI failen.
+      - run: semgrep ci --config "p/typescript" --config "p/owasp-top-ten" --config "p/security-audit"
+        env:
+          SEMGREP_RULES: "p/typescript p/owasp-top-ten p/security-audit"
