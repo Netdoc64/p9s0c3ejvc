@@ -45,6 +45,7 @@ describe("OpenAPI 3.1 spec", () => {
       "/v1/products/search",
       "/v1/products/{id}",
       "/v1/products/import",
+      "/v1/suppliers/imports/{source}",
       "/v1/suppliers/floriday",
       "/v1/suppliers/floriday/sync",
       "/v1/suppliers/floriday/catalog",

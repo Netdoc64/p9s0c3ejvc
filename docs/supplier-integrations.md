@@ -4,6 +4,43 @@ Die Anbindungen sind pro Mandant konfiguriert. Die API verwendet dieselbe
 Tenant-HMAC-Signatur wie die übrigen Routen unter `/v1`. Die Routen und
 Request-Schemas stehen im laufenden Worker unter `/openapi.json`.
 
+## Lieferantenangebote aus Dateien übernehmen
+
+Für freigegebene Lieferantenexporte ohne direkte API kann pro Mandant und
+Quelle ein Angebotsstand importiert werden. Legt je Lieferant einen eigenen
+stabilen Quellschlüssel an, etwa `supplier-a`. Bringt die Exportdatei in das
+folgende JSON-Format und sendet sie signiert an `POST /v1/suppliers/imports/supplier-a`.
+
+```json
+{
+  "revision": 1,
+  "expires_at": "2027-01-02T12:00:00Z",
+  "items": [
+    {
+      "sku": "ROSE-01",
+      "name": "Rote Rose",
+      "unit": "stem",
+      "unit_price": "0.275",
+      "currency": "EUR",
+      "available_quantity": 80,
+      "minimum_quantity": 10
+    }
+  ]
+}
+```
+
+Preise und Mengen beziehen sich auf `unit`. Verwendet je Export eine höhere
+`revision` und eine Gültigkeit gemäß Lieferant. Ein Stand ersetzt den bisherigen
+vollständig und umfasst bis zu 500 Artikel. `items: []` leert die Quelle. Eine
+identische Wiederholung liefert `applied: false`. Ältere oder widersprüchliche
+Stände liefern HTTP 409.
+
+`GET /v1/suppliers/imports/supplier-a?limit=50` listet die Angebote. Für die
+nächste Seite `next_after` als Query-Parameter `after` verwenden. Beginnt bei
+einem Revisionswechsel wieder auf Seite eins. Nach Ablauf enthält die Antwort
+die Revisionsdaten und eine leere Artikelliste. Der Import hält die Angebote
+getrennt vom internen Bestand, von Preislisten und von der Bestellübermittlung.
+
 ## Floriday für den Großhandel
 
 Floriday stellt die Zugangsdaten für OAuth und den API-Schlüssel für das
@@ -38,6 +75,18 @@ Behaltet ihn bei einer Schlüsselrotation bei. Bei einem Wechsel des Käuferkont
 verwendet einen neuen Bezeichner. Daten und Bestellungen sind durch Mandant,
 Anbieter und Konto einschließlich Floriday-Environment getrennt. Ein Worker
 außerhalb der Produktion akzeptiert nur Floridays Staging-Environment.
+
+### Staging-Verbindung prüfen
+
+Verwendet einen aktiven Staging-Testmandanten, dessen Tenant-API-Key und
+Signaturschlüssel sowie das freigeschaltete Floriday-Staging-Käuferkonto.
+Setzt `ordering` und `scheduled` auf `false`. Prüft zuerst den Status mit
+`GET /v1/suppliers/floriday` und ruft danach `/sync` per `POST` auf. Der Sync
+liest bei Floriday und aktualisiert nur den Staging-Datenspeicher. Prüft über
+die signierten `GET`-Aufrufe für `/catalog?limit=1` und `/offers?limit=1` ein
+bekanntes Testangebot samt Preis, Bestellfenster und Artikelzuordnung. Ein
+erfolgreicher Sync mit leeren Listen bestätigt nur die Verbindung. Die
+Anmeldung der Pilot-App läuft separat über ein Kunden-Testkonto.
 
 ### Angebote abrufen
 
