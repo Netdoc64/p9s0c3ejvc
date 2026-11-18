@@ -12,3 +12,8 @@ REST-Endpoints `POST /v1/orders` (Draft anlegen + Auto-Chain bis `awaiting_confi
 ### Bewusst Plan-Revision-Kandidaten
 - E2E-Test mit miniflare hat den DO-Storage-Edge-Case (siehe M08-Learning); manueller `wrangler dev`-Test deckt es ab.
 - Hartes Confirm während on_hold blockiert — User muss manuell `gates_log` reviewen oder Spec für Resume-Pfad ergänzen.
+
+### 2026-11-18 — Checkout-Servertests Kunde (Q04)
+- `tests/routes/customer-checkout.spec.ts` prüft über die echte Kunden-API: abgelaufene Reservierung → 410 GH-STOCK-002; zwei parallele Bestätigungen → genau eine 200, die andere 409; Storno nach Bestätigung → 409 GH-STATE-001; fremder Auftrag (confirm und cancel) → 404 GH-ORDER-001. Es wird der Problem-JSON-Code geprüft, nicht nur der Status.
+- Fund: `stock.ts ensureScope` las die Antwort des StockDO nicht. Der erste Test, der den StockDO über die Service-Schicht anspricht, scheiterte mit „Isolated storage failed" (Windows: EBUSY). Fix: Antwort vollständig lesen (`arrayBuffer()`). Kein Verhaltensunterschied im Betrieb.
+- Setup-Hinweis: der Auftrag wird direkt als `awaiting_confirmation` mit echter Reservierung (adjust + reserve im StockDO) angelegt; Preise/Steuern sind nicht Gegenstand.

@@ -34,7 +34,8 @@ export function key(p: { tenant_id: string; warehouse_id: string; sku_id: string
 type AnyStub = any;
 
 async function ensureScope(stub: AnyStub, p: { tenant_id: string; warehouse_id: string; sku_id: string }): Promise<void> {
-  await stub.fetch("https://stock.local/scope", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(p) });
+  const res = await stub.fetch("https://stock.local/scope", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(p) });
+  await res.arrayBuffer(); // Antwort vollständig lesen, sonst bleibt die DO-Verbindung offen (Storage-Isolation der Tests)
 }
 
 async function fetchDo(stub: AnyStub, path: string, body: unknown): Promise<{ status: number; json: unknown }> {
