@@ -15,6 +15,19 @@ export const FRONTEND = [
 
 export const istFrontend = (pfad) => FRONTEND.some((re) => re.test(pfad));
 
+/** GitHub-Konten, unter denen Codex arbeitet. Ihre PRs sind immer Frontend, egal wie der Branch heißt. */
+export const CODEX_KONTEN = ["fsvarrunner"];
+
+/**
+ * Seite einer PR: zuerst nach dem Konto, das sie öffnet, dann nach dem Branch.
+ * Das Konto geht vor, weil ein Branch-Name frei wählbar ist (am 18.11. öffnete
+ * Codex eine Backend-PR von `orchester/…`).
+ */
+export function seiteVonPr(branch, autor) {
+  if (autor && CODEX_KONTEN.includes(String(autor).toLowerCase())) return "frontend";
+  return seiteVonBranch(branch);
+}
+
 /** Welche Seite ein Branch ist, oder null für Branches ohne Zuordnung (Mensch). */
 export function seiteVonBranch(branch) {
   if (/^codex\//.test(branch)) return "frontend";
