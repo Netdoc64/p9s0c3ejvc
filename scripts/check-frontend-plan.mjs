@@ -1,9 +1,10 @@
 import assert from "node:assert/strict";
 import { existsSync, readFileSync } from "node:fs";
-import { resolve } from "node:path";
+import { isAbsolute, relative, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 
 const docs = fileURLToPath(new URL("../docs/", import.meta.url));
+const root = fileURLToPath(new URL("../", import.meta.url));
 const planFile = process.argv[2] ?? resolve(docs, "frontend-build-plan.json");
 
 function indexById(entries, label) {
@@ -39,6 +40,48 @@ function checkMarkdownLinks(file) {
   }
 }
 
+function checkEvidence({ file, test }, context) {
+  assert(typeof file === "string" && file.length > 0 && !isAbsolute(file), `${context} needs a repository-relative evidence file`);
+  const path = resolve(root, file);
+  const relativePath = relative(root, path);
+  assert(relativePath && !relativePath.startsWith("..") && !isAbsolute(relativePath), `${context} evidence must stay inside the repository`);
+  const source = readFileSync(path, "utf8");
+  if (test === undefined) return;
+  assert(typeof test === "string" && test.trim().length > 0, `${context} needs a test name`);
+  assert(source.includes(JSON.stringify(test)), `${context} cannot find test ${test} in ${file}`);
+}
+
+function checkProgress(entries) {
+  for (const item of entries) {
+    assert(["planned", "in_progress", "done"].includes(item.status), `${item.id} has an invalid progress status`);
+    assert(typeof item.progress_note === "string" && item.progress_note.trim().length > 0, `${item.id} needs a progress note`);
+    assert(Array.isArray(item.evidence) && item.evidence.length > 0, `${item.id} needs evidence`);
+    for (const evidence of item.evidence) checkEvidence(evidence, item.id);
+  }
+}
+
+function checkNumberedIds(entries, prefix, first, last, label) {
+  const expected = Array.from({ length: last - first + 1 }, (_, index) => `${prefix}${String(first + index).padStart(2, "0")}`);
+  assert.deepEqual([...entries.keys()].sort(), expected, `${label} must cover ${expected[0]}–${expected.at(-1)}`);
+}
+
+function checkCoverage(tests) {
+  checkNumberedIds(tests, "T", 1, 25, "Verification");
+  for (const { id, coverage } of tests.values()) {
+    assert(["open", "covered"].includes(coverage?.status), `${id} needs an open or covered status`);
+    assert(Array.isArray(coverage.tests), `${id} needs a test reference list`);
+    if (coverage.status === "covered") {
+      assert(coverage.tests.length > 0, `${id} needs a test reference`);
+    } else {
+      assert(typeof coverage.reason === "string" && coverage.reason.trim().length > 0, `${id} needs a reason for open coverage`);
+    }
+    for (const evidence of coverage.tests) {
+      assert(evidence?.test !== undefined, `${id} needs a test name`);
+      checkEvidence(evidence, id);
+    }
+  }
+}
+
 function checkPlan(plan) {
   const modules = indexById(plan.modules, "module");
   const decisions = indexById(plan.modules.flatMap((module) => module.open_questions), "decision");
@@ -46,8 +89,13 @@ function checkPlan(plan) {
   const tests = indexById(plan.verification, "verification");
   const operations = indexById(plan.api_contract.operations, "API operation");
   const packages = indexById(plan.implementation_handoff.packages, "work package");
+  checkNumberedIds(modules, "F", 0, 7, "Modules");
+  checkNumberedIds(packages, "W", 1, 11, "Work packages");
   checkDependencies(modules, "Module");
   checkDependencies(packages, "Work package");
+  checkProgress(modules.values());
+  checkProgress(packages.values());
+  checkCoverage(tests);
 
   for (const module of modules.values()) {
     checkReferences(module.required_decisions, decisions, module.id);

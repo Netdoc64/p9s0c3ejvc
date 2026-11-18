@@ -17,7 +17,7 @@
     ],
     "simulation_basis": "Nutzerwege anhand des Backend-Bauplans und des Repo-Stands a540ecf simuliert. App-, Geräte- und Staging-Abnahmen stehen aus.",
     "validation_command": "node scripts/check-frontend-plan.mjs",
-    "runtime_verification": "Vorgesehene Abnahmetests wurden als Planungsszenarien geprüft. Ausführung in einer App, auf Geräten und in Staging steht aus."
+    "runtime_verification": "Der Web-Ablauf ist mit Demo-Daten und gegen einen lokalen Worker testbar. Abnahmefälle weisen vorhandene Tests und offene Prüfschritte einzeln aus. Geräte-, Staging- und Pilotabnahme stehen aus."
   },
   "orchestration": {
     "agent_input": [
@@ -1493,7 +1493,7 @@
     {
       "id": "F00",
       "name": "Pilotvertrag und Tests",
-      "status": "planned",
+      "status": "in_progress",
       "depends_on": [],
       "open_questions": [
         {
@@ -1594,12 +1594,21 @@
       ],
       "screens": [],
       "api_operations": [],
-      "required_decisions": []
+      "required_decisions": [],
+      "evidence": [
+        {
+          "file": "docs/frontend-plan.md"
+        },
+        {
+          "file": "mobile/tests/fixtures/worker.ts"
+        }
+      ],
+      "progress_note": "Synthetische Fixtures und lokaler API-Vertrag liegen vor. Pilotentscheidungen und Nachweise aus Staging stehen aus."
     },
     {
       "id": "F01",
       "name": "Einstieg, Anmeldung und Navigation",
-      "status": "planned",
+      "status": "in_progress",
       "depends_on": [
         "F00"
       ],
@@ -2309,12 +2318,24 @@
       ],
       "required_decisions": [
         "Q01"
-      ]
+      ],
+      "evidence": [
+        {
+          "file": "mobile/app/index.tsx"
+        },
+        {
+          "file": "mobile/src/remote.ts"
+        },
+        {
+          "file": "mobile/tests/worker-smoke.mjs"
+        }
+      ],
+      "progress_note": "Anmeldung, PKCE und Sitzungsrotation sind im lokalen Web-Ablauf implementiert. Native Geräteabnahme steht aus."
     },
     {
       "id": "F02",
       "name": "Katalog, Suche und Artikeldetail",
-      "status": "planned",
+      "status": "in_progress",
       "depends_on": [
         "F01"
       ],
@@ -2935,12 +2956,24 @@
       ],
       "required_decisions": [
         "Q02"
-      ]
+      ],
+      "evidence": [
+        {
+          "file": "mobile/app/index.tsx"
+        },
+        {
+          "file": "mobile/src/remote.ts"
+        },
+        {
+          "file": "mobile/tests/smoke.mjs"
+        }
+      ],
+      "progress_note": "Katalog, Suche und Artikeldetail laufen in Demo und lokaler API. Mengen- und Preisbasis des Piloten ist offen."
     },
     {
       "id": "F03",
       "name": "Warenkorb und Preisvorschau",
-      "status": "planned",
+      "status": "in_progress",
       "depends_on": [
         "F02"
       ],
@@ -3240,12 +3273,24 @@
       "required_decisions": [
         "Q02",
         "Q06"
-      ]
+      ],
+      "evidence": [
+        {
+          "file": "mobile/app/index.tsx"
+        },
+        {
+          "file": "mobile/src/demo.ts"
+        },
+        {
+          "file": "mobile/tests/worker-smoke.mjs"
+        }
+      ],
+      "progress_note": "Warenkorb und Preisvorschau sind umgesetzt. Offline-Wiederaufnahme und geräteübergreifender Entwurf bleiben zu prüfen."
     },
     {
       "id": "F04",
       "name": "Bestellprüfung, Reservierung und Bestätigung",
-      "status": "planned",
+      "status": "in_progress",
       "depends_on": [
         "F03"
       ],
@@ -4113,12 +4158,24 @@
         "Q03",
         "Q04",
         "Q06"
-      ]
+      ],
+      "evidence": [
+        {
+          "file": "mobile/app/index.tsx"
+        },
+        {
+          "file": "mobile/tests/worker-smoke.mjs"
+        },
+        {
+          "file": "tests/routes/customer-checkout.spec.ts"
+        }
+      ],
+      "progress_note": "Reservierungsprüfung, Bestätigung und Wiederaufnahme laufen lokal. Lieferprozess, Fristen und Staging-Abnahme sind offen."
     },
     {
       "id": "F05",
       "name": "Bestellhistorie, Detail und Rechnung",
-      "status": "planned",
+      "status": "in_progress",
       "depends_on": [
         "F04"
       ],
@@ -4741,12 +4798,24 @@
       "required_decisions": [
         "Q04",
         "Q05"
-      ]
+      ],
+      "evidence": [
+        {
+          "file": "mobile/app/index.tsx"
+        },
+        {
+          "file": "mobile/tests/worker-smoke.mjs"
+        },
+        {
+          "file": "tests/routes/customer-api.spec.ts"
+        }
+      ],
+      "progress_note": "Historie und PDF-Abruf sind lokal sichtbar. Der Pilotprozess für fehlende Rechnungen ist offen."
     },
     {
       "id": "F06",
       "name": "Konto, Hilfe und Wiederbestellung",
-      "status": "planned",
+      "status": "in_progress",
       "depends_on": [
         "F01",
         "F05"
@@ -5262,7 +5331,16 @@
         "revoke",
         "profile"
       ],
-      "required_decisions": []
+      "required_decisions": [],
+      "evidence": [
+        {
+          "file": "mobile/app/index.tsx"
+        },
+        {
+          "file": "mobile/tests/worker-smoke.mjs"
+        }
+      ],
+      "progress_note": "Kontoansicht, Hilfe und Abmeldung sind implementiert. Offline-Abmeldung und verspätete Antworten bleiben zu prüfen."
     },
     {
       "id": "F07",
@@ -5315,7 +5393,13 @@
         "Q03",
         "Q05",
         "Q06"
-      ]
+      ],
+      "evidence": [
+        {
+          "file": "docs/frontend-plan.md"
+        }
+      ],
+      "progress_note": "Die Geräte- und Innendienstabnahme ist im Plan beschrieben und steht aus."
     }
   ],
   "phases": [
@@ -5361,151 +5445,349 @@
       "id": "T01",
       "module": "F01",
       "scenario": "Kundin aus kaltem Start mit eingeliefertem E-Mail-Code anmelden",
-      "expected": "Richtiger Händler, richtiges Konto und zugänglicher Katalog"
+      "expected": "Richtiger Händler, richtiges Konto und zugänglicher Katalog",
+      "coverage": {
+        "status": "covered",
+        "tests": [
+          {
+            "file": "mobile/tests/worker-smoke.mjs",
+            "test": "Pass: Browser PKCE and customer profile"
+          }
+        ]
+      }
     },
     {
       "id": "T02",
       "module": "F01",
       "scenario": "Falschen Code und serverseitig abgelaufenen Code als GH-AUTH-006 behandeln, dann lokalen Fristablauf und Ratenlimit prüfen",
-      "expected": "Generische Abweisung bei gleichem Servercode. Lokaler Ablauf und Ratenlimit haben passende Folgeaktionen ohne Kontenoffenlegung"
+      "expected": "Generische Abweisung bei gleichem Servercode. Lokaler Ablauf und Ratenlimit haben passende Folgeaktionen ohne Kontenoffenlegung",
+      "coverage": {
+        "status": "open",
+        "reason": "Serverseitigen Ablauf, lokalen Fristablauf und Ratenlimit gemeinsam prüfen.",
+        "tests": [
+          {
+            "file": "tests/auth/flow.spec.ts",
+            "test": "falscher Code → 410 GH-AUTH-006"
+          }
+        ]
+      }
     },
     {
       "id": "T03",
       "module": "F02",
       "scenario": "Zwei Suchen schnell nacheinander und erste Antwort verspätet liefern",
-      "expected": "Sichtbare Ergebnisse und Menge gehören zur aktuellen Auswahl"
+      "expected": "Sichtbare Ergebnisse und Menge gehören zur aktuellen Auswahl",
+      "coverage": {
+        "status": "open",
+        "reason": "Zwei überlappende Suchen mit vertauschter Antwortreihenfolge ausführen.",
+        "tests": []
+      }
     },
     {
       "id": "T04",
       "module": "F03",
       "scenario": "Menge über Staffelschwelle erhöhen, Netz trennen und App neu starten",
-      "expected": "Gespeicherte Mengen bleiben. Preis wird nach Rückkehr passend neu geladen"
+      "expected": "Gespeicherte Mengen bleiben. Preis wird nach Rückkehr passend neu geladen",
+      "coverage": {
+        "status": "open",
+        "reason": "Staffelwechsel mit Offline-Neustart und Preisaktualisierung prüfen.",
+        "tests": []
+      }
     },
     {
       "id": "T05",
       "module": "F04",
       "scenario": "Hintergrundwechsel nach Reservierung und späteres Wiederöffnen",
-      "expected": "Derselbe Entwurf mit aktueller Frist und zulässigen Aktionen"
+      "expected": "Derselbe Entwurf mit aktueller Frist und zulässigen Aktionen",
+      "coverage": {
+        "status": "open",
+        "reason": "App-Hintergrundwechsel und Rückkehr zu derselben Reservierung auf einem Gerät prüfen.",
+        "tests": [
+          {
+            "file": "tests/routes/customer-checkout.spec.ts",
+            "test": "abgelaufene Reservierung → 410 GH-STOCK-002"
+          }
+        ]
+      }
     },
     {
       "id": "T06",
       "module": "F04",
       "scenario": "Verbindung nach Annahme der Bestätigung trennen und App beenden",
-      "expected": "Nach Wiederstart genau ein Auftrag und genau eine Bestandsbuchung"
+      "expected": "Nach Wiederstart genau ein Auftrag und genau eine Bestandsbuchung",
+      "coverage": {
+        "status": "open",
+        "reason": "Der Worker-Smoke findet nach Neustart genau einen Auftrag. Die Bestandsbuchung zusätzlich verifizieren.",
+        "tests": [
+          {
+            "file": "mobile/tests/worker-smoke.mjs",
+            "test": "Pass: lost confirmed response across browser reload and login"
+          }
+        ]
+      }
     },
     {
       "id": "T07",
       "module": "F04",
       "scenario": "Zwei Konten versuchen den letzten Bestand zu bestellen",
-      "expected": "Höchstens eine Bestätigung. Das zweite Konto kann Menge korrigieren"
+      "expected": "Höchstens eine Bestätigung. Das zweite Konto kann Menge korrigieren",
+      "coverage": {
+        "status": "open",
+        "reason": "Zwei Konten um den letzten Bestand konkurrieren lassen. Der Demo-Test zeigt die Mengenkorrektur.",
+        "tests": [
+          {
+            "file": "mobile/tests/smoke.mjs",
+            "test": "Bestandskonflikt"
+          }
+        ]
+      }
     },
     {
       "id": "T08",
       "module": "F04",
       "scenario": "Abbruch und Bestätigung gleichzeitig auslösen",
-      "expected": "Ein konsistenter Endzustand mit korrektem Bestand"
+      "expected": "Ein konsistenter Endzustand mit korrektem Bestand",
+      "coverage": {
+        "status": "open",
+        "reason": "Storno und Bestätigung tatsächlich parallel auslösen und den Endbestand prüfen.",
+        "tests": [
+          {
+            "file": "tests/routes/customer-checkout.spec.ts",
+            "test": "Storno nach Bestätigung → 409 GH-STATE-001"
+          }
+        ]
+      }
     },
     {
       "id": "T09",
       "module": "F04",
       "scenario": "Preis steigt zwischen Vorschau und Reservierung",
-      "expected": "Neue Summe und betroffene Positionen sind vor verbindlicher Bestätigung sichtbar"
+      "expected": "Neue Summe und betroffene Positionen sind vor verbindlicher Bestätigung sichtbar",
+      "coverage": {
+        "status": "open",
+        "reason": "Der Demo-Test findet den Änderungshinweis. Neue Summe und betroffene Positionen gezielt prüfen.",
+        "tests": [
+          {
+            "file": "mobile/tests/smoke.mjs",
+            "test": "Preiswechsel"
+          }
+        ]
+      }
     },
     {
       "id": "T10",
       "module": "F05",
       "scenario": "Zweites Konto öffnet fremden Auftrag und Rechnungslink aus derselben Händlerumgebung",
-      "expected": "Kundenbezogene Ausgabedaten bleiben geschützt. Freigegebene kurzlebige Links gesondert prüfen"
+      "expected": "Kundenbezogene Ausgabedaten bleiben geschützt. Freigegebene kurzlebige Links gesondert prüfen",
+      "coverage": {
+        "status": "open",
+        "reason": "Auch das konkrete fremde Rechnungsziel und kurzlebige Links mit dem zweiten Konto öffnen.",
+        "tests": [
+          {
+            "file": "tests/routes/customer-api.spec.ts",
+            "test": "eine fremde Bestellung ist „nicht gefunden“, nicht „verboten“"
+          }
+        ]
+      }
     },
     {
       "id": "T11",
       "module": "F05",
       "scenario": "PDF fehlt, Auftrag ist bestätigt, PDF wird später verfügbar",
-      "expected": "Auftrag bleibt bestätigt. Rechnung kann nach Aktualisierung geöffnet werden"
+      "expected": "Auftrag bleibt bestätigt. Rechnung kann nach Aktualisierung geöffnet werden",
+      "coverage": {
+        "status": "open",
+        "reason": "Fehlendes PDF bei bestätigter Bestellung simulieren und späteren Abruf prüfen.",
+        "tests": [
+          {
+            "file": "mobile/tests/worker-smoke.mjs",
+            "test": "Pass: customer checkout and actual invoice PDF"
+          }
+        ]
+      }
     },
     {
       "id": "T12",
       "module": "F06",
       "scenario": "Abmelden offline und anderes Konto auf demselben Gerät öffnen",
-      "expected": "Keine alten Bestellungen, Preise, Warenkörbe oder PDFs werden angezeigt"
+      "expected": "Keine alten Bestellungen, Preise, Warenkörbe oder PDFs werden angezeigt",
+      "coverage": {
+        "status": "open",
+        "reason": "Offline-Abmeldung mit anschließendem Kontowechsel und allen lokalen Datenarten prüfen.",
+        "tests": [
+          {
+            "file": "mobile/tests/worker-smoke.mjs",
+            "test": "Pass: customer separation after logout"
+          }
+        ]
+      }
     },
     {
       "id": "T13",
       "module": "F07",
       "scenario": "Kernweg mit Screenreader, vergrößerter Schrift und System-Zurück",
-      "expected": "Texte bleiben lesbar, Aktionen erreichbar und Fokus nachvollziehbar"
+      "expected": "Texte bleiben lesbar, Aktionen erreichbar und Fokus nachvollziehbar",
+      "coverage": {
+        "status": "open",
+        "reason": "Screenreader, vergrößerte Schrift und System-Zurück im nativen Build prüfen.",
+        "tests": []
+      }
     },
     {
       "id": "T14",
       "module": "F07",
       "scenario": "Innendienst prüft Auftrag aus mobilem Testbuild",
-      "expected": "Auftragsreferenz, Artikel, Menge, Preis, Steuer und Lieferart stimmen überein"
+      "expected": "Auftragsreferenz, Artikel, Menge, Preis, Steuer und Lieferart stimmen überein",
+      "coverage": {
+        "status": "open",
+        "reason": "Auftragsdaten aus einem mobilen Testbuild mit dem Innendienst abgleichen.",
+        "tests": []
+      }
     },
     {
       "id": "T15",
       "module": "F01",
       "scenario": "Erneute Code-Anforderung erreicht Server, Antwort geht verloren, jüngster Code trifft ein",
-      "expected": "Neuester Code kann eingegeben werden. Die App setzt keine bestätigte neue Frist aus einem Timeout"
+      "expected": "Neuester Code kann eingegeben werden. Die App setzt keine bestätigte neue Frist aus einem Timeout",
+      "coverage": {
+        "status": "open",
+        "reason": "Verlorene Antwort nach erneuter Code-Anforderung und Verwendung des jüngsten Codes prüfen.",
+        "tests": []
+      }
     },
     {
       "id": "T16",
       "module": "F03",
       "scenario": "Im geöffneten Warenkorb Mengenänderung oder Rückgängig versuchen, während auf einem zweiten Gerät ein aktiver Entwurf erscheint",
-      "expected": "App bietet Fortsetzen oder serverseitig bestätigten Abbruch. Keine zweite Reservierung"
+      "expected": "App bietet Fortsetzen oder serverseitig bestätigten Abbruch. Keine zweite Reservierung",
+      "coverage": {
+        "status": "open",
+        "reason": "Mengenänderung im offenen Warenkorb während eines Entwurfs auf einem zweiten Gerät prüfen.",
+        "tests": [
+          {
+            "file": "tests/routes/customer-pilot.spec.ts",
+            "test": "ein neuer Warenkorb liefert nicht den offenen Entwurf zurück"
+          }
+        ]
+      }
     },
     {
       "id": "T17",
       "module": "F04",
       "scenario": "Verbindliche Bestätigung absenden, nachdem eine andere zulässige Aktion die angezeigte Revision geändert hat",
-      "expected": "Server lehnt die alte Revision ab. Vor erneutem Bestellklick ist die neue Revision sichtbar"
+      "expected": "Server lehnt die alte Revision ab. Vor erneutem Bestellklick ist die neue Revision sichtbar",
+      "coverage": {
+        "status": "open",
+        "reason": "Angezeigte Revision zwischen Aufruf und Bestätigung ändern und Aktualisierung der Ansicht prüfen.",
+        "tests": []
+      }
     },
     {
       "id": "T18",
       "module": "F04",
       "scenario": "Operation ist nach Abbruch der Verbindung bei Rückkehr nicht auffindbar",
-      "expected": "Erneut senden erscheint nur mit autoritativer Freigabe und vorhandenem ursprünglichen Payload"
+      "expected": "Erneut senden erscheint nur mit autoritativer Freigabe und vorhandenem ursprünglichen Payload",
+      "coverage": {
+        "status": "open",
+        "reason": "Autoritative Wiederholfreigabe mit und ohne ursprünglichen Payload in der App prüfen.",
+        "tests": [
+          {
+            "file": "tests/routes/customer-pilot.spec.ts",
+            "test": "ein unbekannter Vorgang darf wiederholt werden"
+          }
+        ]
+      }
     },
     {
       "id": "T19",
       "module": "F07",
       "scenario": "Freigabe der nächsten App-Version bei offenem Bestellvorgang",
-      "expected": "Update führt nur zu geprüftem Ziel. Nach Wechsel zuerst denselben Vorgang abgleichen"
+      "expected": "Update führt nur zu geprüftem Ziel. Nach Wechsel zuerst denselben Vorgang abgleichen",
+      "coverage": {
+        "status": "open",
+        "reason": "Versionswechsel mit laufendem Bestellvorgang auf einem Pilotgerät prüfen.",
+        "tests": []
+      }
     },
     {
       "id": "T20",
       "module": "F03",
       "scenario": "Sonderpreis wird vor Staffel priorisiert. Ein anderes Angebot hat eine steuerfreie Position",
-      "expected": "Keine unbelegte Rabattbehauptung. Gültige Nullsteuer bleibt von fehlender Berechnung unterscheidbar"
+      "expected": "Keine unbelegte Rabattbehauptung. Gültige Nullsteuer bleibt von fehlender Berechnung unterscheidbar",
+      "coverage": {
+        "status": "open",
+        "reason": "Geprüfte Preis- und Steuerregeln gemeinsam in der App prüfen.",
+        "tests": [
+          {
+            "file": "tests/engines/pricing.spec.ts",
+            "test": "customer_special schlägt qty_break"
+          },
+          {
+            "file": "tests/engines/tax.spec.ts",
+            "test": "SKU tax_class=zero → zero 0%"
+          }
+        ]
+      }
     },
     {
       "id": "T21",
       "module": "F07",
       "scenario": "Bestellung wurde gespeichert, Händlerzustellung ist unterbrochen",
-      "expected": "Kundenstatus bleibt korrekt. Zustellung separat nachverfolgbar und ohne zweite Bestellung nachholbar"
+      "expected": "Kundenstatus bleibt korrekt. Zustellung separat nachverfolgbar und ohne zweite Bestellung nachholbar",
+      "coverage": {
+        "status": "open",
+        "reason": "Gespeicherten Auftrag und Kundenstatus bei unterbrochener Händlerzustellung gemeinsam prüfen.",
+        "tests": [
+          {
+            "file": "tests/services/outbox-delivery.spec.ts",
+            "test": "Netzwerkfehler wird wie Fehlerantwort behandelt (retrying)"
+          }
+        ]
+      }
     },
     {
       "id": "T22",
       "module": "F05",
       "scenario": "PDF lädt, dann meldet sich die Kundin ab und ein anderes Konto an",
-      "expected": "Späte PDF-Antwort trägt keine Daten in die neue Sitzung"
+      "expected": "Späte PDF-Antwort trägt keine Daten in die neue Sitzung",
+      "coverage": {
+        "status": "open",
+        "reason": "PDF-Antwort erst nach Wechsel ins andere Konto zustellen und Isolation prüfen.",
+        "tests": []
+      }
     },
     {
       "id": "T23",
       "module": "F04",
       "scenario": "Vorgang nach Timeout nachschlagen. Server bestätigt keine sichere Wiederholung.",
-      "expected": "Keine aktive Wiederholungs- oder neue Kaufaktion. Status und Kontakt bleiben erreichbar."
+      "expected": "Keine aktive Wiederholungs- oder neue Kaufaktion. Status und Kontakt bleiben erreichbar.",
+      "coverage": {
+        "status": "open",
+        "reason": "Statusantwort ohne Wiederholfreigabe simulieren und verfügbare Aktionen prüfen.",
+        "tests": []
+      }
     },
     {
       "id": "T24",
       "module": "F04",
       "scenario": "Stale Revision liefert Konflikt. Neuen Auftragsstand laden und erst nach neuem Klick bestätigen.",
-      "expected": "Erster Versuch erzeugt keine Buchung. Neue Revision darf genau einmal bewusst bestätigt werden."
+      "expected": "Erster Versuch erzeugt keine Buchung. Neue Revision darf genau einmal bewusst bestätigt werden.",
+      "coverage": {
+        "status": "open",
+        "reason": "Veraltete Revision absenden, Buchungen prüfen und erst mit einem neuen Klick bestätigen.",
+        "tests": []
+      }
     },
     {
       "id": "T25",
       "module": "F01",
       "scenario": "Code mit fehlender E-Mail-Konfiguration anfordern, danach mit vorbereitetem Testversand erneut versuchen",
-      "expected": "Beim ersten Aufruf keine Erfolgsmeldung. Händlerkontakt und erneute Anforderung bleiben möglich. Anschließend kommt der Testcode an."
+      "expected": "Beim ersten Aufruf keine Erfolgsmeldung. Händlerkontakt und erneute Anforderung bleiben möglich. Anschließend kommt der Testcode an.",
+      "coverage": {
+        "status": "open",
+        "reason": "Fehlenden Mailversand und anschließenden Erfolg nach Korrektur im selben App-Ablauf prüfen.",
+        "tests": []
+      }
     }
   ],
   "deferred": [
@@ -6309,7 +6591,20 @@
           "T06",
           "T09",
           "T17"
-        ]
+        ],
+        "status": "done",
+        "evidence": [
+          {
+            "file": "docs/frontend-build-plan.json"
+          },
+          {
+            "file": "mobile/src/demo.ts"
+          },
+          {
+            "file": "mobile/tests/smoke.mjs"
+          }
+        ],
+        "progress_note": "Synthetische Vertragsbeispiele und getrennte Demoszenarien für Preiswechsel und Antwortverlust liegen vor."
       },
       {
         "id": "W02",
@@ -6329,7 +6624,20 @@
           "T02",
           "T15",
           "T25"
-        ]
+        ],
+        "status": "in_progress",
+        "evidence": [
+          {
+            "file": "mobile/app/index.tsx"
+          },
+          {
+            "file": "mobile/app/_layout.tsx"
+          },
+          {
+            "file": "mobile/src/contracts.ts"
+          }
+        ],
+        "progress_note": "App-Shell, Sitzung und austauschbarer Client liegen vor. Ein installierter nativer Entwicklungsbuild ist offen."
       },
       {
         "id": "W03",
@@ -6352,7 +6660,17 @@
           "T02",
           "T15",
           "T25"
-        ]
+        ],
+        "status": "in_progress",
+        "evidence": [
+          {
+            "file": "mobile/tests/fixtures/worker.ts"
+          },
+          {
+            "file": "mobile/tests/worker-smoke.mjs"
+          }
+        ],
+        "progress_note": "Der lokale Test-Mailadapter ermöglicht getrennte Kundenlogins. Staging-Testpostfach und Versandnachweis stehen aus."
       },
       {
         "id": "W04",
@@ -6375,7 +6693,20 @@
           "T03",
           "T04",
           "T20"
-        ]
+        ],
+        "status": "in_progress",
+        "evidence": [
+          {
+            "file": "mobile/src/remote.ts"
+          },
+          {
+            "file": "mobile/tests/worker-smoke.mjs"
+          },
+          {
+            "file": "tests/engines/pricing.spec.ts"
+          }
+        ],
+        "progress_note": "Katalog und Preisvorschau werden lokal genutzt. Die vereinbarten Pilotgebinde und -steuerfälle müssen auf Staging geprüft werden."
       },
       {
         "id": "W05",
@@ -6397,7 +6728,20 @@
           "T04",
           "T16",
           "T20"
-        ]
+        ],
+        "status": "in_progress",
+        "evidence": [
+          {
+            "file": "mobile/app/index.tsx"
+          },
+          {
+            "file": "mobile/src/demo.ts"
+          },
+          {
+            "file": "mobile/tests/smoke.mjs"
+          }
+        ],
+        "progress_note": "Demo-Katalog, Produktsuche und Warenkorb funktionieren im Browser. Verzögerte Suchantworten und Offline-Wiederaufnahme sind offen."
       },
       {
         "id": "W06",
@@ -6422,7 +6766,20 @@
           "T18",
           "T23",
           "T24"
-        ]
+        ],
+        "status": "in_progress",
+        "evidence": [
+          {
+            "file": "mobile/app/index.tsx"
+          },
+          {
+            "file": "mobile/src/demo.ts"
+          },
+          {
+            "file": "mobile/tests/smoke.mjs"
+          }
+        ],
+        "progress_note": "Demo-Szenarien zeigen Preiswechsel, Bestandskonflikt und Wiederaufnahme. Ausstehend sind die gezielten Revisions- und Abbruchfälle."
       },
       {
         "id": "W07",
@@ -6451,7 +6808,20 @@
           "T18",
           "T23",
           "T24"
-        ]
+        ],
+        "status": "in_progress",
+        "evidence": [
+          {
+            "file": "tests/routes/customer-pilot.spec.ts"
+          },
+          {
+            "file": "tests/routes/customer-checkout.spec.ts"
+          },
+          {
+            "file": "mobile/tests/worker-smoke.mjs"
+          }
+        ],
+        "progress_note": "Bestelloperationen, Idempotenz und Reservierungsgrenzen sind lokal testbar. Die Lager- und Lieferzuordnung auf Staging ist offen."
       },
       {
         "id": "W08",
@@ -6473,7 +6843,20 @@
           "T11",
           "T12",
           "T22"
-        ]
+        ],
+        "status": "in_progress",
+        "evidence": [
+          {
+            "file": "mobile/app/index.tsx"
+          },
+          {
+            "file": "mobile/src/demo.ts"
+          },
+          {
+            "file": "mobile/tests/smoke.mjs"
+          }
+        ],
+        "progress_note": "Historie, Musterrechnung, Konto und Abmeldung sind sichtbar. Offen sind fehlende PDFs und Sitzungswechsel während eines Abrufs."
       },
       {
         "id": "W09",
@@ -6495,7 +6878,17 @@
           "T10",
           "T11",
           "T22"
-        ]
+        ],
+        "status": "in_progress",
+        "evidence": [
+          {
+            "file": "tests/routes/customer-api.spec.ts"
+          },
+          {
+            "file": "mobile/tests/worker-smoke.mjs"
+          }
+        ],
+        "progress_note": "Kundentrennung und echtes Bestell-PDF sind lokal prüfbar. Der Test des Rechnungsprozesses auf Staging steht aus."
       },
       {
         "id": "W10",
@@ -6535,7 +6928,17 @@
           "T23",
           "T24",
           "T25"
-        ]
+        ],
+        "status": "in_progress",
+        "evidence": [
+          {
+            "file": "mobile/src/remote.ts"
+          },
+          {
+            "file": "mobile/tests/worker-smoke.mjs"
+          }
+        ],
+        "progress_note": "Die App spricht im Worker-Smoke mit der Kunden-API. End-to-End-Nachweise auf Pilotgeräten und Staging fehlen."
       },
       {
         "id": "W11",
@@ -6565,7 +6968,14 @@
           "T19",
           "T21",
           "T22"
-        ]
+        ],
+        "status": "planned",
+        "evidence": [
+          {
+            "file": "docs/frontend-plan.md"
+          }
+        ],
+        "progress_note": "Die Abnahme mit dem Innendienst wartet auf Staging und die Pilotentscheidungen."
       }
     ],
     "test_scope": {
