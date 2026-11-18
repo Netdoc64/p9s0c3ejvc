@@ -32,3 +32,7 @@
 - Betriebs-Einstieg ist ein Queue-Auftrag `{ kind: "stock_rebuild", force?, targets? }` auf `OUTBOX_QUEUE` (`src/workers/queue-handler.ts` → `src/services/stock-rebuild-run.ts`). Keine HTTP-Route; auslösen kann nur, wer an die Queue senden darf (Cloudflare-Konto/Binding). Ohne `targets` wird der Plan aus D1 berechnet, mit `targets` ein vorher geprüfter Plan (`scripts/rebuild-stock.ts --out`) eingespielt.
 - Fehler → `msg.retry()` (idempotent, ohne `force` überschreibt ein Wiederholen nichts); Ergebnis als Log `stock.rebuild` (Zähler rebuilt/unchanged/exists). Nachrichten >128 KB passen nicht in die Queue — bei sehr großen Plänen den Plan weglassen (D1-Berechnung).
 - Test: `tests/dr/stock-rebuild-trigger.spec.ts`. **Offen:** Runbook `disaster-restore.md` Schritt 2 nennt noch „nur aus dem Worker-Code“ und sollte den Queue-Auftrag beschreiben.
+
+## 2026-11-18 — Runbook zum Queue-Auftrag
+
+- `docs/runbooks/disaster-restore.md` Schritt 2 beschreibt jetzt den Queue-Auftrag `stock_rebuild`: Nachrichtenform, Senden über Dashboard oder API, erst ohne `force`, Erfolg am Log `stock.rebuild`, Fehler über Retry/Dead-Letter. Der offene Punkt aus dem vorigen Eintrag ist damit erledigt.
