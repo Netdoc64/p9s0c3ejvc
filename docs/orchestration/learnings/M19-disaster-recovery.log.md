@@ -26,3 +26,9 @@
 - `/rebuild` überschreibt abweichenden Zustand nur mit `force` (sonst 409), identischer Zustand ist ein No-op → idempotent. Nur per Stub erreichbar; Test prüft, dass v1-Routen es nicht ausliefern.
 - Test-Pool: Antworten von `stub.fetch` immer vollständig lesen und offene Reservierungs-Alarme abarbeiten (`runDurableObjectAlarm`), sonst „Isolated storage failed" (`.sqlite-shm`).
 - **Offen:** Es gibt keinen Betriebs-Einstieg, der `rebuildStockDO` gegen die echten DOs aufruft (bewusst keine Route). Nötig wäre ein interner Auslöser (z. B. geschützter Queue-/Cron-Handler oder Service-Binding).
+
+## 2026-11-18 — Interner Auslöser für den Rebuild
+
+- Betriebs-Einstieg ist ein Queue-Auftrag `{ kind: "stock_rebuild", force?, targets? }` auf `OUTBOX_QUEUE` (`src/workers/queue-handler.ts` → `src/services/stock-rebuild-run.ts`). Keine HTTP-Route; auslösen kann nur, wer an die Queue senden darf (Cloudflare-Konto/Binding). Ohne `targets` wird der Plan aus D1 berechnet, mit `targets` ein vorher geprüfter Plan (`scripts/rebuild-stock.ts --out`) eingespielt.
+- Fehler → `msg.retry()` (idempotent, ohne `force` überschreibt ein Wiederholen nichts); Ergebnis als Log `stock.rebuild` (Zähler rebuilt/unchanged/exists). Nachrichten >128 KB passen nicht in die Queue — bei sehr großen Plänen den Plan weglassen (D1-Berechnung).
+- Test: `tests/dr/stock-rebuild-trigger.spec.ts`. **Offen:** Runbook `disaster-restore.md` Schritt 2 nennt noch „nur aus dem Worker-Code“ und sollte den Queue-Auftrag beschreiben.

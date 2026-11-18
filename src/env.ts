@@ -37,6 +37,21 @@ export interface OutboxMessage {
   subscription_id?: string;
 }
 
+/**
+ * Interner Betriebs-Auftrag (kein Outbox-Event): StockDO-Bestand aus D1 neu
+ * aufbauen. Nur wer an die Queue senden darf (Binding/wrangler), kann ihn
+ * auslösen — es gibt keine HTTP-Route dafür. `targets` optional: ein
+ * geprüfter Plan (scripts/rebuild-stock.ts --out); ohne Angabe wird der Plan
+ * aus stock_movements/stock_batches berechnet.
+ */
+export interface StockRebuildMessage {
+  kind: "stock_rebuild";
+  force?: boolean;
+  targets?: import("./services/stock-rebuild").StockTarget[];
+}
+
+export type QueueMessage = OutboxMessage | StockRebuildMessage;
+
 export type AppContext = {
   Bindings: Env;
   Variables: AppVariables;

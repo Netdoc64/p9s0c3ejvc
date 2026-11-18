@@ -1,4 +1,5 @@
-import type { Env, OutboxMessage } from "../env";
+import type { Env, QueueMessage } from "../env";
+import { runStockRebuild } from "../services/stock-rebuild-run";
 import { deliverEvent } from "../services/outbox";
 import { isCodedError } from "../errors/catalog";
 
@@ -15,11 +16,14 @@ const HARD_FAIL_CODES = new Set([
 /**
  * Queue-Consumer: liefert Outbox-Events an Webhook-Subscribers.
  */
-export async function queueHandler(batch: MessageBatch<OutboxMessage>, env: Env): Promise<void> {
+export async function queueHandler(batch: MessageBatch<QueueMessage>, env: Env): Promise<void> {
   for (const msg of batch.messages) {
     try {
-      if (msg.body?.event_id) {
-        await deliverEvent(env, msg.body.event_id);
+      const body = msg.body;
+      if ("kind" in body && body.kind === "stock_rebuild") {
+        await runStockRebuild(env, body);
+      } else if ("event_id" in body && body.event_id) {
+        await deliverEvent(env, body.event_id);
       }
       msg.ack();
     } catch (err) {
