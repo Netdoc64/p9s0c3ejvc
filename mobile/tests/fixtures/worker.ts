@@ -1,9 +1,9 @@
-import worker, { StockDO, CronLockDO, InvoiceNumberDO, RateLimitDO } from "../../../src/index";
+import worker, { StockDO, CronLockDO, InvoiceNumberDO, RateLimitDO, ReturnsDO } from "../../../src/index";
 import { setEmailAdapter } from "../../../src/auth/email";
 import { adjust } from "../../../src/services/stock";
 import type { Env } from "../../../src/env";
 
-export { StockDO, CronLockDO, InvoiceNumberDO, RateLimitDO };
+export { StockDO, CronLockDO, InvoiceNumberDO, RateLimitDO, ReturnsDO };
 // Test entry point used only by the localhost integration runner.
 const inbox = new Map<string, string>();
 setEmailAdapter({ async send(message) { inbox.set(message.to, message.text.match(/\b[2-9A-HJ-NP-Z]{8}\b/)?.[0] ?? ""); } });
