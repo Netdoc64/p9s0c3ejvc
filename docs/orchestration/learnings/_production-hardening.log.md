@@ -72,3 +72,8 @@ Alle Änderungen rein additiv:
 - Per-Batch FEFO-Allocation-Tracking (qty_remaining-Spalte)
 - Real APNs/FCM (M23-Plan-Revision)
 - Webhook-Configuration via Terraform
+
+## Prod-Konfigpruefung (scripts/check-prod-config.mjs)
+- Reine Funktion `pruefeProdConfig(tomlText)` + CLI (Exit 1 bei Befunden); kleiner TOML-Leser ohne Abhaengigkeit.
+- Heute bewusst Exit 1: DB-`database_id` und KV-`id` in `[env.production]` sind Platzhalter (0000…).
+- vitest laeuft im Workers-Pool (kein fs): Test liest wrangler.toml per `import.meta.glob(?raw)`; CLI laeuft nur als Hauptmodul.
