@@ -19,6 +19,38 @@ function scope(owner: Owner, id: string) {
   return [owner.tenant_id, owner.customer_id, id];
 }
 
+/** Ist der Auftrag in dem Zustand, den der Vorgang herbeiführen sollte? */
+export function isSettled(kind: CheckoutOperation["kind"], state: string | null | undefined): boolean {
+  if (!state) return false;
+  if (kind === "draft") return !["draft", "resolving"].includes(state);
+  if (kind === "confirm") return ["confirmed", "shipped", "invoiced", "paid"].includes(state);
+  return state === "cancelled";
+}
+
+/**
+ * Offene Vorgänge des Kunden abschließen, deren Auftrag inzwischen im Zielzustand ist
+ * (Antwort ging verloren, bevor `response_json` geschrieben wurde). Läuft auf dem
+ * SCHREIBWEG vor jedem neuen Claim — ein offener Claim sperrt über die Partial-Unique-
+ * Indizes sonst den nächsten Vorgang. `GET /order-operations/:id` liest nur.
+ */
+export async function settlePending(env: Env, owner: Owner, build: (order_id: string) => Promise<unknown>): Promise<number> {
+  const { results } = await env.DB.prepare(`SELECT o.operation_id, o.kind, o.order_id, r.state_current, r.customer_id AS order_customer
+    FROM customer_order_operations o LEFT JOIN orders r ON r.tenant_id = o.tenant_id AND r.id = o.order_id
+    WHERE o.tenant_id = ? AND o.customer_id = ? AND o.response_json IS NULL`)
+    .bind(owner.tenant_id, owner.customer_id)
+    .all<{ operation_id: string; kind: CheckoutOperation["kind"]; order_id: string; state_current: string | null; order_customer: string | null }>();
+  let settled = 0;
+  for (const row of results) {
+    if (row.order_customer !== owner.customer_id || !isSettled(row.kind, row.state_current)) continue;
+    const value = await build(row.order_id);
+    const r = await env.DB.prepare(`UPDATE customer_order_operations SET response_json = ?
+      WHERE tenant_id = ? AND customer_id = ? AND operation_id = ? AND response_json IS NULL`)
+      .bind(JSON.stringify(value), ...scope(owner, row.operation_id)).run();
+    settled += r.meta.changes ?? 0;
+  }
+  return settled;
+}
+
 export function readOperation(env: Env, owner: Owner, id: string) {
   return env.DB.prepare(`SELECT order_id, kind, request_hash, idempotency_key, response_json FROM customer_order_operations
     WHERE tenant_id = ? AND customer_id = ? AND operation_id = ?`).bind(...scope(owner, id)).first<CheckoutOperation>();

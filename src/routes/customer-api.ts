@@ -22,7 +22,7 @@ import { tenants } from "../db/schema/tenants";
 import { parseCursor, signCursor } from "../lib/http";
 import { resolvePricingFromDb } from "../services/pricing-resolver";
 import { newId } from "../lib/ids";
-import { readOperation, runOperation, type CheckoutOperation } from "../services/customer-order-operations";
+import { isSettled, readOperation, runOperation, settlePending, type CheckoutOperation } from "../services/customer-order-operations";
 import * as orders from "../services/customer-orders";
 
 export const customerApiRoutes = new Hono<AppContext>();
@@ -160,13 +160,14 @@ customerApiRoutes.post("/orders", async (c) => {
   return c.json(result, 201);
 });
 
-function checkout<T>(
+async function checkout<T>(
   c: Context<AppContext>, s: orders.CustomerSession, operationId: string | undefined,
   operation: Pick<CheckoutOperation, "order_id" | "kind">, payload: unknown, execute: () => Promise<T>,
-) {
+): Promise<T> {
   if (!operationId) return execute();
   const key = OperationId.safeParse(c.req.header("X-Idempotency-Key"));
   if (!key.success) throw new CodedError("GH-INPUT-001", { field: "X-Idempotency-Key" });
+  await settlePending(c.env, s, (order_id) => viewOrder(c, s, order_id));
   return runOperation(c.env, s, operationId, key.data, operation, payload, execute);
 }
 
@@ -246,21 +247,13 @@ customerApiRoutes.get("/order-operations/:id", async (c) => {
   if (!operation) return c.json({ operation_id: id, repeat_allowed: true, state: "not_recorded" });
   const saved = operation.response_json ? JSON.parse(operation.response_json) as { id: string } : undefined;
   if (!saved) {
+    // Nur lesen: abgeschlossen wird der Vorgang auf dem nächsten Schreibweg (settlePending).
     const record = await ordersRepo.findById(getDb(c.env.DB), s.tenant_id, operation.order_id);
-    const state = record?.doc.state.current;
-    const settled = state && (operation.kind === "draft" ? !["draft", "resolving"].includes(state)
-      : operation.kind === "confirm" ? ["confirmed", "shipped", "invoiced", "paid"].includes(state)
-        : state === "cancelled");
-    if (!settled || record.doc.customer_id !== s.customer_id) {
+    if (!record || record.doc.customer_id !== s.customer_id || !isSettled(operation.kind, record.doc.state.current)) {
       return c.json({ operation_id: id, repeat_allowed: false, state: "pending" });
     }
   }
   const order = await viewOrder(c, s, saved?.id ?? operation.order_id);
-  if (!saved) {
-    await c.env.DB.prepare(`UPDATE customer_order_operations SET response_json = ?
-      WHERE tenant_id = ? AND customer_id = ? AND operation_id = ? AND response_json IS NULL`)
-      .bind(JSON.stringify(order), s.tenant_id, s.customer_id, id).run();
-  }
   return c.json({ operation_id: id, repeat_allowed: false, state: "completed", order });
 });
 
