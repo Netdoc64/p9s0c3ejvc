@@ -60,9 +60,13 @@ function checkProgress(entries) {
   }
 }
 
+function checkNumberedIds(entries, prefix, first, last, label) {
+  const expected = Array.from({ length: last - first + 1 }, (_, index) => `${prefix}${String(first + index).padStart(2, "0")}`);
+  assert.deepEqual([...entries.keys()].sort(), expected, `${label} must cover ${expected[0]}–${expected.at(-1)}`);
+}
+
 function checkCoverage(tests) {
-  const expected = Array.from({ length: 25 }, (_, index) => `T${String(index + 1).padStart(2, "0")}`);
-  assert.deepEqual([...tests.keys()].sort(), expected, "Verification must cover T01–T25");
+  checkNumberedIds(tests, "T", 1, 25, "Verification");
   for (const { id, coverage } of tests.values()) {
     assert(["open", "covered"].includes(coverage?.status), `${id} needs an open or covered status`);
     assert(Array.isArray(coverage.tests), `${id} needs a test reference list`);
@@ -85,6 +89,8 @@ function checkPlan(plan) {
   const tests = indexById(plan.verification, "verification");
   const operations = indexById(plan.api_contract.operations, "API operation");
   const packages = indexById(plan.implementation_handoff.packages, "work package");
+  checkNumberedIds(modules, "F", 0, 7, "Modules");
+  checkNumberedIds(packages, "W", 1, 11, "Work packages");
   checkDependencies(modules, "Module");
   checkDependencies(packages, "Work package");
   checkProgress(modules.values());
