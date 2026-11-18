@@ -44,13 +44,42 @@ neu berechnet (Summe `qty_delta`; reserve/release/auto_release tragen 0).
    Summe aktiver Chargen (`stock_batches`). Ein Hinweis „Chargen weichen ab"
    oder „negativer Bestand" vor dem Einspielen klären — der Zielwert kommt
    immer aus den Bewegungen.
-2. **Einspielen:** `rebuildStockDO(env, targets, { force })` aus
-   `src/services/stock-rebuild.ts` ruft je Schlüssel die DO-Aktion `/rebuild`
-   per Stub. Die Aktion ist **nicht über HTTP-Routen erreichbar** (weder
-   `/v1/…` noch `index.ts`), nur aus dem Worker-Code. Ohne `force` bleibt ein
-   vorhandener, abweichender DO-Zustand unangetastet (Ergebnis `exists`);
-   identischer Zustand ist `unchanged` (idempotent). `force` nur nach
-   Prüfung des Plans.
+2. **Einspielen** über den internen Queue-Auftrag `stock_rebuild`. Eine
+   HTTP-Route gibt es bewusst nicht. Auslösen kann nur, wer an die Queue senden
+   darf (Cloudflare-Konto bzw. Binding).
+
+   | Feld | Bedeutung |
+   |---|---|
+   | `kind` | immer `"stock_rebuild"` |
+   | `force` | `true` überschreibt einen abweichenden DO-Zustand. Ohne `force` bleibt er stehen (Ergebnis `exists`). |
+   | `targets` | optional: der geprüfte Plan aus Schritt 1 (`plan.json`). Fehlt er, berechnet der Worker den Plan selbst aus D1. |
+
+   Die Nachricht geht an die Outbox-Queue der Umgebung (`grosshandel-outbox`
+   bzw. `grosshandel-outbox-staging`, siehe `wrangler.toml`):
+
+   - **Dashboard:** Queues → Queue der Umgebung → Nachricht senden, Inhalt als JSON.
+   - **API:** `POST https://api.cloudflare.com/client/v4/accounts/<ACCOUNT_ID>/queues/<QUEUE_ID>/messages`
+     mit `{"body": {"kind": "stock_rebuild"}}`. Das Token kommt aus dem
+     Schlüsselspeicher, nie aus einer Datei im Repo.
+
+   Reihenfolge in der Praxis:
+   1. Erst **ohne** `force` senden: `{"kind": "stock_rebuild"}`. Leere oder
+      gleiche DOs werden aufgebaut bzw. bleiben `unchanged`.
+   2. Das Ergebnis steht im Worker-Log als Ereignis `stock.rebuild` mit den
+      Zählern `total`, `rebuilt`, `unchanged`, `exists` und `source` (`d1` oder
+      `plan`).
+   3. Nur wenn `exists > 0` und der Plan aus Schritt 1 geprüft ist: erneut mit
+      `"force": true` senden, am besten mit `targets` aus `plan.json`.
+      Nachrichten über 128 KB passen nicht in die Queue: bei großen Plänen
+      `targets` weglassen, dann rechnet der Worker selbst aus D1.
+
+   Fehler: Die Queue wiederholt den Auftrag (`msg.retry()`, höchstens
+   `max_retries`, danach die Dead-Letter-Queue). Das ist gefahrlos, weil ein
+   Wiederholen ohne `force` nichts überschreibt. Im Log stehen `queue.error`
+   bzw. `queue.hard_fail` mit Code.
+
+   Intern ruft der Auftrag `rebuildStockDO(env, targets, { force })` aus
+   `src/services/stock-rebuild.ts` auf (DO-Aktion `/rebuild` per Stub).
 3. **Was verloren geht:** offene Reservierungen (Warenkörbe, TTL ≤ 15 min) und
    noch nicht nach D1 gedrainte `pending_movements`. Bewegungen, die ein
    fehlgeschlagener Flush nur in KV (`stock:movements:lost:*`, 14 Tage) ablegte,
