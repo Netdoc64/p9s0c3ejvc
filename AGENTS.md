@@ -36,8 +36,9 @@ Bis das Backend steht, arbeitet die App gegen Mock-Daten (`mobile/src/demo.ts`).
   Die CI prüft Autor, Committer und `Co-authored-by`.
 - Keine Firmennamen, keine echten E-Mail-Adressen (nur `.example` / `example.com`),
   keine Konto-IDs, keine workers.dev-Adressen, keine Namen privater Repos.
-- Eine PR je Issue, „Closes #<nr>“ in die Beschreibung. Erst aus dem Entwurf nehmen,
-  wenn sie fertig ist. Ein Entwurf wird nicht gemergt.
+- Eine PR je Issue, „Closes #<nr>“ in die Beschreibung. **Eine fertige PR nicht als Entwurf
+  öffnen**, oder sie gleich danach aus dem Entwurf nehmen: Das Gate mergt keinen Entwurf, und
+  niemand sonst nimmt ihn heraus. Entwurf nur, solange wirklich noch gearbeitet wird.
 - Gemergt wird automatisch über das Gate, sobald `build-and-test` grün ist.
 - Neue Migrationen bekommen die nächste freie Nummer. Der Migrations-Wächter
   (`tests/db/migrations-numbering.spec.ts`) verlangt eindeutige, lückenlose Präfixe.
