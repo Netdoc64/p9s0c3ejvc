@@ -136,6 +136,55 @@ describe("Kunden-API mit operation_id", () => {
   });
 });
 
+describe("GET /order-operations/:id liest nur (#6)", () => {
+  async function settledOrderWithOpenClaim(operation_id: string) {
+    const order_id = newId("order");
+    const now = new Date().toISOString();
+    await getDb(env.DB).insert(orders).values({
+      id: order_id, tenant_id: t.tenant_id, customer_id: custA, state_current: "confirmed", total_cents: 0, currency: "EUR",
+      plan: JSON.stringify({ next_steps: [], executed_steps: [] }), issues: JSON.stringify({ blocking: [], warnings: [] }),
+      totals: JSON.stringify({ subtotal_cents: 0, tax_cents: 0, total_cents: 0, currency: "EUR" }), etag: "e1", created_at: now, updated_at: now,
+    });
+    await env.DB.prepare(`INSERT INTO customer_order_operations
+      (tenant_id, customer_id, operation_id, idempotency_key, order_id, kind, request_hash, created_at)
+      VALUES (?, ?, ?, ?, ?, 'confirm', 'h', ?)`).bind(t.tenant_id, custA, operation_id, idem(operation_id), order_id, now).run();
+    return order_id;
+  }
+  const responseJson = (operation_id: string) => env.DB.prepare(
+    "SELECT response_json FROM customer_order_operations WHERE tenant_id = ? AND customer_id = ? AND operation_id = ?",
+  ).bind(t.tenant_id, custA, operation_id).first<{ response_json: string | null }>();
+
+  it("meldet einen abgeschlossenen Vorgang als completed, ohne zu schreiben", async () => {
+    const order_id = await settledOrderWithOpenClaim("op_lesen_0001");
+    const res = await SELF.fetch("https://example.com/v1/customer/order-operations/op_lesen_0001", {
+      headers: { ...CLIENT, Authorization: `Bearer ${await token(custA)}` },
+    });
+    expect(res.status).toBe(200);
+    expect(await res.json()).toMatchObject({ state: "completed", repeat_allowed: false, order: { id: order_id } });
+    expect((await responseJson("op_lesen_0001"))?.response_json).toBeNull();
+  });
+
+  it("der nächste Schreibweg des Kunden schließt den offenen Vorgang ab", async () => {
+    const order_id = await settledOrderWithOpenClaim("op_lesen_0002");
+    await SELF.fetch("https://example.com/v1/customer/orders", {
+      method: "POST",
+      headers: { ...CLIENT, "Content-Type": "application/json", "X-Idempotency-Key": idem("schreib"), Authorization: `Bearer ${await token(custA)}` },
+      body: JSON.stringify({ operation_id: "op_schreib_0001", lines: [{ sku_id: "sku_unbekannt", qty: 1 }] }),
+    });
+    const saved = (await responseJson("op_lesen_0002"))?.response_json;
+    expect(saved).not.toBeNull();
+    expect(JSON.parse(saved as string)).toMatchObject({ id: order_id });
+  });
+
+  it("ein fremder Vorgang bleibt für andere Kunden unsichtbar", async () => {
+    await settledOrderWithOpenClaim("op_lesen_0003");
+    const res = await SELF.fetch("https://example.com/v1/customer/order-operations/op_lesen_0003", {
+      headers: { ...CLIENT, Authorization: `Bearer ${await token(custB)}` },
+    });
+    expect(await res.json()).toMatchObject({ state: "not_recorded" });
+  });
+});
+
 describe("CORS der Kunden-API", () => {
   it("gibt fremden Origins ohne Freigabe kein CORS", async () => {
     const res = await SELF.fetch("https://example.com/v1/customer/me", {
