@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 // @ts-expect-error — reines ESM-Skript ohne Typen
-import { fremdePfade, istFrontend, seiteVonBranch } from "../../scripts/zustaendigkeit.mjs";
+import { fremdePfade, istFrontend, seiteVonBranch, seiteVonPr } from "../../scripts/zustaendigkeit.mjs";
 
 describe("Zuständigkeit Claude/Codex (AGENTS.md)", () => {
   it("ordnet Branches einer Seite zu", () => {
@@ -8,6 +8,12 @@ describe("Zuständigkeit Claude/Codex (AGENTS.md)", () => {
     expect(seiteVonBranch("orchester/ziel-thema")).toBe("backend");
     expect(seiteVonBranch("claude/fix")).toBe("backend");
     expect(seiteVonBranch("feature/hand")).toBeNull();
+  });
+
+  it("das Konto geht vor dem Branch-Namen", () => {
+    expect(seiteVonPr("orchester/supplier-file-import", "fsvarrunner")).toBe("frontend");
+    expect(seiteVonPr("orchester/ziel-thema", "Netdoc64")).toBe("backend");
+    expect(seiteVonPr("feature/hand", undefined)).toBeNull();
   });
 
   it("kennt die Frontend-Pfade", () => {
