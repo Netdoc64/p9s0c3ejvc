@@ -143,12 +143,12 @@ vars = { ENVIRONMENT = "production", WORKER_VERSION = "0.1.0" }
 [[env.production.d1_databases]]
 binding = "DB"
 database_name = "grosshandel-prod"
-database_id = "00000000-0000-0000-0000-000000000000"  # MUST replace before prod-deploy
+database_id = "fcad6c05-1793-416d-aead-f0734b43cb72"  # grosshandel-prod (weur), angelegt 2026-11-22
 migrations_dir = "migrations"
 
 [[env.production.kv_namespaces]]
 binding = "KV"
-id = "0000000000000000000000000000000000"  # MUST replace before prod-deploy
+id = "9f5d43284a5e49c28c2c10fee26775b7"  # grosshandel-kv-prod, angelegt 2026-11-22
 
 [[env.production.send_email]]
 name = "EMAIL"
