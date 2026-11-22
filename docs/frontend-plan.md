@@ -1,6 +1,6 @@
 # Frontend-Bauplan für den Blumen-Großhandel
 
-**Stand** · Planungsübergabe auf Basis von Backend-Commit `a540ecf` abgeschlossen. Die Nutzerabläufe sind simuliert. Mock-Pakete sind startklar. Preise, Warenverfügbarkeit und Verhalten im Pilotbetrieb benötigen die dokumentierten fachlichen Freigaben und Tests auf Staging und Geräten.
+**Stand** · Die Pilot-App unterstützt den Web-Ablauf mit Demo-Daten und mit der Kunden-API eines lokalen Workers. Preise, Warenverfügbarkeit und Verhalten im Pilotbetrieb benötigen die dokumentierten fachlichen Freigaben und Tests auf Staging und Geräten.
 
 **Detaillierter Bauplan** · [frontend-build-plan.json](frontend-build-plan.json) enthält pro Modul die Planungsdurchläufe, Screens, Bedienelemente, Zustände, Übergänge und Abnahmekriterien. Der Abschnitt `backend_alignment` verknüpft alle 25 Backend-Module und sieben zurückgestellte Themen mit dem Frontend. `scenario_traces` hält die geprüften Schrittabfolgen fest. Die folgende Übersicht beschreibt den Pilotumfang und den Backend-Stand.
 
@@ -120,7 +120,7 @@ Die Pfade sind neue Kundenschnittstellen unter `/v1/customer`. F00 hält Felder,
 
 ## Übergabe an die umsetzenden Agenten
 
-Im JSON stehen unter `implementation_handoff` elf Arbeitspakete mit Zuständigkeit, Abhängigkeiten, Ergebnis und verknüpften Abnahmefällen. Login, Katalog, Warenkorb, Checkout und Historie können mit den vereinbarten Mock-Antworten vorbereitet werden. Die Freigaben in F00 bestimmen, welche Pakete mit Staging-Daten integriert und für den Pilot abgenommen werden.
+Im JSON stehen unter `implementation_handoff` elf Arbeitspakete mit Zuständigkeit, Abhängigkeiten, verknüpften Abnahmefällen und aktuellem Stand. Der Fortschritt der Module und Pakete ist mit Dateien belegt. Die Freigaben in F00 bestimmen, welche Pakete mit Staging-Daten integriert und für den Pilot abgenommen werden.
 
 Unter `api_contract.pilot_fixture` stehen Beispielanfragen, Antworten und UI-Zustände für einen erfolgreichen Auftrag, einen Preiswechsel, eine verlorene Bestätigungsantwort und einen Bestandskonflikt. Zwei weitere Fälle prüfen ein ungeklärtes Ergebnis ohne Wiederholungsfreigabe und eine abgewiesene Auftragsrevision. `api_contract.checkout_recovery` verknüpft Serverergebnisse mit den passenden Anzeigen und Aktionen. Die Preise, Steuer und Mengen sind synthetisch. Sie dienen als Planungs- und Testdaten bis zur fachlichen Bestätigung.
 
@@ -137,4 +137,4 @@ Unter `api_contract.pilot_fixture` stehen Beispielanfragen, Antworten und UI-Zus
 node scripts/check-frontend-plan.mjs
 ```
 
-Der Befehl prüft Abhängigkeiten, Quellen, klickbare Ziele und den Zusammenhang zwischen Beispielpayloads und Vertragsfeldern. Ein Defekt in der Planung führt zu einem Fehlercode. Gerätetests und Tests gegen die Staging-API folgen bei der Umsetzung. Unter `handoff_readiness` steht, welcher Nachweis für die sechs verbleibenden Pilotentscheidungen benötigt wird.
+Der Befehl prüft Abhängigkeiten, Quellen, klickbare Ziele und den Zusammenhang zwischen Beispielpayloads und Vertragsfeldern. Unter `verification` nennt jeder Abnahmefall T01–T25 den vorhandenen Test oder den ausstehenden Prüfschritt. Offene Fälle können belegte Teilprüfungen enthalten. Unter `handoff_readiness` steht, welcher Nachweis für die sechs verbleibenden Pilotentscheidungen benötigt wird.
