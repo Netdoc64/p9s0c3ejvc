@@ -30,6 +30,9 @@ jobs:
           cache: npm
           cache-dependency-path: mobile/package-lock.json
 
+      - name: Frontend-Plan prüfen
+        run: node scripts/check-frontend-plan.mjs
+
       - name: Mobile-Abhängigkeiten installieren
         working-directory: mobile
         run: npm ci
