@@ -13,6 +13,7 @@ import { fsnOrderInput } from "../integrations/flower-shop-network";
 import { fleuropOrder, fleuropReconcile } from "../integrations/fleurop";
 import { komanderCheckout } from "../integrations/komander";
 import { purchaseInput } from "../integrations/floriday";
+import { snapshotInput, snapshotOffer, snapshotSku, snapshotSource } from "../integrations/supplier-snapshots";
 import { toJsonSchema, type JsonSchema } from "./json-schema";
 import type { z } from "zod";
 import { CreateReturnInput, DeliveryInput, ReturnCommandInput, ReturnRef, SupplierHandoff } from "../schemas/returns";
@@ -1028,6 +1029,31 @@ const supplierOperation = (operationId: string, summary: string, schema: JsonSch
   tags: ["suppliers"], security: TENANT_AUTH, operationId, summary,
   responses: { ...Object.fromEntries([JSON_RESPONSE(summary, schema, status)]), ...supplierErrors },
 });
+const snapshotPath = "/v1/suppliers/imports/{source}";
+const snapshotSourceParameter = { name: "source", in: "path", required: true, schema: toSchema(snapshotSource) };
+paths[snapshotPath] = {
+  post: {
+    ...supplierOperation("importSupplierSnapshot", "Lieferantenangebote importieren", {
+      type: "object", required: ["revision", "imported", "applied"], properties: {
+        revision: { type: "integer" }, imported: { type: "integer" }, applied: { type: "boolean" },
+      },
+    }),
+    parameters: [snapshotSourceParameter],
+    requestBody: { required: true, content: { "application/json": { schema: toSchema(snapshotInput) } } },
+  },
+  get: {
+    ...supplierOperation("listSupplierSnapshot", "Importierte Lieferantenangebote lesen", {
+      type: "object", required: ["revision", "expires_at", "items", "next_after"], properties: {
+        revision: { type: "integer" }, expires_at: { type: "string", format: "date-time" },
+        items: { type: "array", items: toSchema(snapshotOffer) }, next_after: { type: ["string", "null"] },
+      },
+    }),
+    parameters: [snapshotSourceParameter,
+      { name: "after", in: "query", schema: toSchema(snapshotSku) },
+      { name: "limit", in: "query", schema: { type: "integer", minimum: 1, maximum: 200, default: 50 } },
+    ],
+  },
+};
 paths[supplierBase] = {
   get: supplierOperation("getFloridayConnection", "Status der Floriday-Anbindung", {
     type: "object", required: ["enabled", "environment", "scheduled", "ordering"], properties: {

@@ -10,6 +10,7 @@ import { FlowerShopNetworkClient, flowerShopNetworkConfig, fsnFloristQuery, fsnO
 import { getSupplierDispatch, sendSupplierDispatch } from "../integrations/supplier-dispatch";
 import { KomanderClient, komanderAvailability, komanderCheckout, komanderConfig, komanderSearch } from "../integrations/komander";
 import { supplierList, syncSupplier } from "../integrations/supplier-sync";
+import { importSnapshot, listSnapshot, snapshotConnection, snapshotInput, snapshotSku, snapshotSource } from "../integrations/supplier-snapshots";
 import { createPurchase, publicOrder, reconcilePurchase, requirePurchase, submitPurchase } from "../integrations/purchase-orders";
 
 export const suppliersRoutes = new Hono<AppContext>();
@@ -38,6 +39,26 @@ async function supplierCall<T>(run: () => Promise<T>, provider = "floriday"): Pr
     throw new CodedError("GH-EXT-002", { provider });
   }
 }
+
+function fileConnection(c: RequestContext) {
+  const tenant = c.var.tenant_id;
+  if (!tenant) throw new CodedError("GH-AUTH-001");
+  return snapshotConnection(tenant, parse(snapshotSource, c.req.param("source")));
+}
+
+suppliersRoutes.post("/imports/:source", async (c) => {
+  const key = fileConnection(c);
+  const input = parse(snapshotInput, await parseJsonBody(c));
+  c.header("Cache-Control", "private, no-store");
+  return c.json(await importSnapshot(c.env.DB, key, input));
+});
+
+suppliersRoutes.get("/imports/:source", async (c) => {
+  const key = fileConnection(c);
+  const after = parse(snapshotSku.optional(), c.req.query("after")) ?? "";
+  c.header("Cache-Control", "private, no-store");
+  return c.json(await listSnapshot(c.env.DB, key, after, parseLimit(c.req.query("limit"))));
+});
 
 suppliersRoutes.get("/floriday", (c) => {
   const tenant = c.var.tenant_id;
