@@ -44,8 +44,18 @@ name = "RETURNS_DO"
 `;
 
 describe("check-prod-config", () => {
-  it("aktuelle wrangler.toml: Befunde zu DB- und KV-Platzhalter", () => {
-    const b = pf(aktuell);
+  // Seit 2026-11-22 stehen echte IDs in [env.production]: die aktuelle Datei
+  // muss also OHNE Befund durchgehen. Die Platzhalter-Erkennung selbst prüft
+  // der Test darunter an einer Kopie mit Platzhaltern — so misst er das
+  // Verhalten des Skripts und nicht den Einrichtungsstand.
+  it("aktuelle wrangler.toml: keine Befunde (Production eingerichtet)", () => {
+    expect(pf(aktuell)).toEqual([]);
+  });
+  it("Platzhalter-IDs für DB und KV werden erkannt", () => {
+    const t = gut
+      .replace(/(\[\[env\.production\.d1_databases\]\][\s\S]*?database_id = ")[^"]*"/, '$100000000-0000-0000-0000-000000000000"')
+      .replace(/(\[\[env\.production\.kv_namespaces\]\][\s\S]*?id = ")[^"]*"/, '$10000000000000000000000000000000000"');
+    const b = pf(t);
     expect(b.some((x) => x.includes("d1 DB") && x.includes("Platzhalter"))).toBe(true);
     expect(b.some((x) => x.includes("kv KV") && x.includes("Platzhalter"))).toBe(true);
     expect(b).toHaveLength(2);
