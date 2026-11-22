@@ -5,15 +5,21 @@ import * as FS from "expo-file-system/legacy";
 import * as SecureStore from "expo-secure-store";
 import * as Sharing from "expo-sharing";
 import { useEffect, useMemo, useRef, useState } from "react";
-import { BackHandler, Image, Linking, Platform, Pressable, ScrollView, StyleSheet, Text, View } from "react-native";
+import { BackHandler, Linking, Platform, Pressable, ScrollView, StyleSheet, Text, View } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { pilotConfiguration } from "../src/config";
 import { demoApi } from "../src/demo";
 import { remoteApi, remoteSessionStore } from "../src/remote";
-import { euro, RequestFailure, type DemoScenario, type LineInput, type Order, type OrderResult, type OrderSummary, type Product, type Quote, type Session } from "../src/contracts";
-import { Button, Card, Input, Loading, Message, colors, styles } from "../src/ui";
+import { RequestFailure, type DemoScenario, type LineInput, type Order, type OrderResult, type OrderSummary, type Product, type Quote, type Session } from "../src/contracts";
+import { Button, Loading, Message, colors, styles } from "../src/ui";
+import { AccountScreen, LogoutScreen, SupportScreen } from "../src/screens/account/view";
+import { CartScreen } from "../src/screens/cart/view";
+import { CatalogScreen, ProductScreen } from "../src/screens/catalog/view";
+import { ConfirmationScreen, PendingScreen, ReviewScreen } from "../src/screens/checkout/view";
+import { LoginScreen } from "../src/screens/login/view";
+import { OrderScreen, OrdersScreen } from "../src/screens/orders/view";
+import type { Screen } from "../src/screens/shared";
 
-type Screen = "catalog" | "product" | "cart" | "review" | "pending" | "issue" | "success" | "orders" | "order" | "account" | "logout" | "support";
 type Pending = { key: string } & (
   { kind: "draft"; lines: LineInput[]; quote: Quote } |
   { kind: "confirm" | "cancel"; order: Order }
@@ -30,16 +36,7 @@ const labels: Record<Screen, string> = {
   ...tabs, product: "Artikel", review: "Bestellung prüfen", pending: "Bestellstatus", issue: "Bestellung korrigieren",
   success: "Bestellung bestätigt", order: "Bestelldetails", logout: "Abmelden", support: "Händler kontaktieren",
 };
-const statuses: Record<Order["state"], string> = {
-  draft: "Entwurf", resolving: "Wird geprüft", awaiting_confirmation: "Noch zu bestätigen",
-  confirmed: "Bestätigt", shipped: "Versandt", invoiced: "Abgerechnet", paid: "Bezahlt",
-  cancelled: "Storniert", on_hold: "Aktion erforderlich",
-};
 const reauthCodes = new Set(["GH-AUTH-002", "GH-AUTH-005", "GH-AUTH-007", "HTTP-401", "REAUTH"]);
-const examples: { id: DemoScenario; label: string }[] = [
-  { id: "normal", label: "Normaler Einkauf" }, { id: "price", label: "Preiswechsel" },
-  { id: "stock", label: "Bestandskonflikt" }, { id: "lost", label: "Antwortverlust" },
-];
 
 function invoiceBase64(pdf: Blob): Promise<string> {
   return new Promise((resolve, reject) => {
@@ -54,46 +51,6 @@ function invoiceBase64(pdf: Blob): Promise<string> {
     };
     reader.readAsDataURL(pdf);
   });
-}
-
-function ProductImage({ item, large = false }: { item: Product; large?: boolean }) {
-  const [failed, setFailed] = useState(false);
-  if (item.image_url && !failed) {
-    return <Image accessible={false} source={{ uri: item.image_url }} resizeMode="cover"
-      style={large ? layout.heroImage : layout.swatch} onError={() => setFailed(true)} />;
-  }
-  if (large) return null;
-  return <View style={layout.swatch}><Text style={layout.swatchText}>{item.sku_code.split("-")[0]}</Text></View>;
-}
-
-function TotalsView({ quote, netOnly }: { quote: Quote["totals"]; netOnly?: boolean }) {
-  return <Card>
-    <Text style={styles.body}>Netto · {euro(quote.subtotal_cents, quote.currency)}</Text>
-    {netOnly ? <Text style={styles.muted}>Steuer und Gesamtbetrag erscheinen bei der Bestellprüfung.</Text> : <>
-      <Text style={styles.body}>Steuer · {euro(quote.tax_cents, quote.currency)}</Text>
-      <Text style={styles.heading}>Gesamt · {euro(quote.total_cents, quote.currency)}</Text>
-    </>}
-  </Card>;
-}
-
-function Quantity({ label, qty, min, change, invalid, disabled }: { label: string; qty: number; min: number; change: (qty: number) => void; invalid: (value: boolean) => void; disabled?: boolean }) {
-  const [text, setText] = useState(String(qty));
-  useEffect(() => { setText(String(qty)); }, [qty]);
-  const valid = /^\d+$/.test(text) && Number(text) >= min && Number(text) <= 500;
-  return <View style={styles.stack}>
-    <Input label={label} value={text} onChangeText={(value) => {
-      setText(value);
-      const number = Number(value);
-      const validValue = /^\d+$/.test(value) && number >= min && number <= 500;
-      invalid(!validValue);
-      if (validValue) change(number);
-    }} keyboardType="number-pad" editable={!disabled} maxLength={3} />
-    {!valid && <Message error>Gib eine ganze Menge zwischen {min} und 500 ein.</Message>}
-    <View style={styles.row}>
-      <Button label="Menge verringern" secondary disabled={disabled || qty <= min} onPress={() => { setText(String(qty - 1)); invalid(false); change(qty - 1); }} />
-      <Button label="Menge erhöhen" secondary disabled={disabled || qty >= 500} onPress={() => { setText(String(qty + 1)); invalid(false); change(qty + 1); }} />
-    </View>
-  </View>;
 }
 
 export default function Pilot() {
@@ -419,18 +376,10 @@ export default function Pilot() {
     });
   }
 
-  const emailValid = /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email.trim());
   const waiting = Math.max(0, Math.ceil((retryAt - clock) / 1000));
   const orderExpired = !!order?.reservation_expires_at && Date.parse(order.reservation_expires_at) <= clock;
   const cartLocked = !!pending || openOrder;
-  const accountHold = order?.issues?.some((issue) => ["GH-CUST-003", "GH-CUST-004"].includes(issue.code));
-  const issueMessage = orderExpired ? "Die Reservierung ist abgelaufen."
-    : accountHold ? "Bitte kläre diese Bestellung mit deinem Händler."
-      : "Die ausgewählte Menge ist derzeit nicht vollständig bestellbar.";
-  const lines = order?.lines.map((line) => <View key={line.sku_id} style={styles.spread}>
-    <Text style={styles.body}>{line.qty} × {line.sale_unit} · {line.name}</Text>
-    <Text style={styles.body}>{euro(line.unit_price_cents, order.totals.currency)} je Einheit</Text>
-  </View>);
+  const refreshView = () => setRefresh((n) => n + 1);
 
   return <SafeAreaView style={layout.safe}>
     <View style={layout.app}>
@@ -446,150 +395,46 @@ export default function Pilot() {
         {message ? <Message>{message}</Message> : null}
         {session && requiresLogin && <Button label="Erneut anmelden" disabled={busy} onPress={reauthenticate} />}
         {booting ? null : !session ? (
-          expires ? <>
-            <Text style={styles.body}>Wenn du registriert bist, erhältst du einen Code für {email.trim()}.</Text>
-            <Input label="Achtstelliger Code" value={code} autoCapitalize="characters" maxLength={10}
-              onChangeText={(value) => setCode(value.toUpperCase().replace(/[^2-9A-HJ-NP-Z]/g, "").slice(0, 8))} />
-            {clock >= expires && <Message>Der zuletzt angeforderte Code ist abgelaufen.</Message>}
-            <Button label="Anmelden" disabled={code.length !== 8 || busy || clock >= expires || waiting > 0} onPress={enter} />
-            <Button label={waiting ? `Code erneut anfordern (${waiting}s)` : "Code erneut anfordern"} secondary disabled={busy || waiting > 0} onPress={sendCode} />
-            <Button label="E-Mail ändern" secondary disabled={busy} onPress={() => { setExpires(0); setCode(""); setError(""); }} />
-            {api.demo && <Text style={styles.muted}>Demo-Code · ABCD2345</Text>}
-          </> : <>
-            <Text style={styles.body}>Bestelle zu den Konditionen deines Betriebs.</Text>
-            <Input label="Geschäftliche E-Mail-Adresse" value={email} onChangeText={setEmail} keyboardType="email-address" autoCapitalize="none" autoComplete="email" />
-            <Button label={waiting ? `Code anfordern (${waiting}s)` : "Code anfordern"} disabled={!emailValid || busy || waiting > 0} onPress={sendCode} />
-            {error && <Button label="Gespeicherte Sitzung prüfen" secondary onPress={() => void restore()} />}
-            {api.demo && <Card><Text style={styles.muted}>Testkonto auswählen</Text>
-              <Button label="Floraly Berlin" secondary onPress={() => setEmail("floraly@example.test")} />
-              <Button label="Blume Amsterdam" secondary onPress={() => setEmail("blume@example.test")} />
-            </Card>}
-          </>
+          <LoginScreen email={email} code={code} expires={expires} clock={clock} waiting={waiting} demo={api.demo}
+            busy={busy} error={error} setEmail={setEmail} setCode={setCode} enter={enter} sendCode={sendCode}
+            restore={() => void restore()} changeEmail={() => { setExpires(0); setCode(""); setError(""); }} />
         ) : <>
-          {screen === "catalog" && <>
-            <Input label="Name oder Artikelnummer" value={query} onChangeText={setQuery} placeholder="Rote Rosen, 60 cm …" />
-            {query && <Button label="Suche leeren" secondary onPress={() => setQuery("")} />}
-            {error && <Button label="Katalog erneut laden" secondary onPress={() => setRefresh((n) => n + 1)} />}
-            {!loading && !error && loadedQuery === query && items.length === 0 && <Text style={styles.muted}>{query ? "Keine passenden Artikel gefunden." : "Der Katalog ist leer."}</Text>}
-            {loadedQuery === query && items.map((item) => <Pressable accessibilityRole="button" accessibilityLabel={`${item.name}, ${item.variant}`} key={item.id} onPress={() => enterProduct(item)} style={layout.product}>
-              <ProductImage key={item.image_url ?? item.id} item={item} />
-              <View style={layout.productText}><Text style={styles.heading}>{item.name}</Text>
-                <Text style={styles.muted}>{item.variant} · {item.contains} {item.unit_of_inner} je {item.sale_unit}</Text></View>
-            </Pressable>)}
-          </>}
-          {screen === "product" && selected && <>
-            <Card><ProductImage key={selected.image_url ?? selected.id} item={selected} large /><Text style={styles.heading}>{selected.name}</Text>
-              <Text style={styles.body}>{selected.variant} · {selected.sku_code}</Text>
-              <Text style={styles.muted}>{selected.contains} {selected.unit_of_inner} je {selected.sale_unit} · Mindestmenge {selected.min_order_qty}</Text>
-            </Card>
-            <Quantity label={`Menge in ${selected.sale_unit}`} qty={qty} min={selected.min_order_qty} change={setQty} invalid={(value) => invalidField("product", value)} disabled={cartLocked} />
-            <Text style={styles.heading}>{activeQuote ? `${euro(activeQuote.lines[0].unit_price_cents)} netto je ${selected.sale_unit}` : "Preis wird geprüft"}</Text>
-            {error && <Button label="Preis erneut laden" secondary onPress={() => setRefresh((n) => n + 1)} />}
-            {cartLocked && <Message>Bearbeite zuerst deine offene Bestellprüfung.</Message>}
-            <Button label="In den Warenkorb" disabled={!activeQuote || cartLocked || invalidFields.product} onPress={() => mergeProduct(selected)} />
-            <Button label="Warenkorb ansehen" secondary onPress={() => go("cart")} />
-          </>}
-          {screen === "cart" && <>
-            {pending ? <Button label="Bestellstatus prüfen" onPress={() => go("pending")} /> : openOrder &&
-              <Button label="Offene Bestellung ansehen" onPress={() => {
-                if (draftOrder) { setOrder(draftOrder); go(draftOrder.state === "on_hold" ? "issue" : "review"); }
-              }} />}
-            {!cart.length && <Text style={styles.muted}>Dein Warenkorb ist leer.</Text>}
-            {cart.map((line) => {
-              const item = products[line.sku_id];
-              const quoted = activeQuote?.lines.find((entry) => entry.sku_id === line.sku_id);
-              return <Card key={line.sku_id}>
-                <Text style={styles.heading}>{item?.name ?? line.sku_id}</Text>
-                {quoted && <Text style={styles.body}>{euro(quoted.unit_price_cents)} netto je {item?.sale_unit ?? "Einheit"}</Text>}
-                <Quantity label={`Menge in ${item?.sale_unit ?? "Verkaufseinheit"} für ${item?.name ?? line.sku_id}`} qty={line.qty} min={item?.min_order_qty ?? 1} disabled={cartLocked}
-                  invalid={(value) => invalidField(line.sku_id, value)} change={(value) => setCart((old) => old.map((entry) => entry.sku_id === line.sku_id ? { ...entry, qty: value } : entry))} />
-                <View style={styles.row}>
-                  {item && <Button label="Artikel ansehen" secondary onPress={() => enterProduct(item)} />}
-                  <Button label={`${item?.name ?? line.sku_id} entfernen`} secondary disabled={cartLocked}
-                    onPress={() => { invalidField(line.sku_id, false); setRemoved(line); setCart((old) => old.filter((entry) => entry.sku_id !== line.sku_id)); }} />
-                </View>
-              </Card>;
-            })}
-            {removed && <Button label="Entfernen rückgängig machen" secondary disabled={cartLocked} onPress={() => {
-              setCart((old) => old.some((line) => line.sku_id === removed.sku_id) ? old : [...old, removed]); setRemoved(undefined);
+          {screen === "catalog" && <CatalogScreen query={query} loadedQuery={loadedQuery} items={items} loading={loading}
+            error={error} setQuery={setQuery} refresh={refreshView} enterProduct={enterProduct} />}
+          {screen === "product" && selected && <ProductScreen selected={selected} qty={qty} activeQuote={activeQuote}
+            cartLocked={cartLocked} error={error} invalidQuantity={invalidFields.product} setQty={setQty}
+            setQuantityInvalid={(value) => invalidField("product", value)} refresh={refreshView}
+            addToCart={() => mergeProduct(selected)} viewCart={() => go("cart")} />}
+          {screen === "cart" && <CartScreen cart={cart} products={products} removed={removed} activeQuote={activeQuote}
+            pending={!!pending} openOrder={openOrder} cartLocked={cartLocked} busy={busy} invalidFields={invalidFields}
+            error={error} go={go} enterProduct={enterProduct} invalidField={invalidField} setCart={setCart}
+            setRemoved={setRemoved} refresh={refreshView} showOpenOrder={() => {
+              if (draftOrder) { setOrder(draftOrder); go(draftOrder.state === "on_hold" ? "issue" : "review"); }
+            }} reviewOrder={(quote) => void run(() => send({ kind: "draft", key: Crypto.randomUUID(), lines: cart, quote }))} />}
+          {(screen === "review" || screen === "issue") && order && <ReviewScreen screen={screen} order={order}
+            orderExpired={orderExpired} changed={changed} demo={api.demo} busy={busy} pending={!!pending}
+            cancelPrompt={cancelPrompt} setCancelPrompt={setCancelPrompt} support={support}
+            confirm={() => void run(() => send({ kind: "confirm", order, key: Crypto.randomUUID() }))}
+            cancel={() => void run(() => send({ kind: "cancel", order, key: Crypto.randomUUID() }))} />}
+          {screen === "pending" && <PendingScreen pending={!!pending} busy={busy} canRepeat={canRepeat}
+            go={go} checkPending={checkPending} support={support} repeatPending={() => {
+              if (pending) void run(() => send(pending));
             }} />}
-            {activeQuote && cart.length > 0 && <TotalsView quote={activeQuote.totals} netOnly={activeQuote.netOnly} />}
-            {cart.length > 0 && !activeQuote && !error && <Text style={styles.muted}>Preise werden geprüft.</Text>}
-            {error && <Button label="Preise erneut prüfen" secondary onPress={() => setRefresh((n) => n + 1)} />}
-            {cart.length > 0 && <Button label="Bestellung prüfen" disabled={!activeQuote || cartLocked || busy || Object.values(invalidFields).some(Boolean)}
-              onPress={() => activeQuote && void run(() => send({ kind: "draft", key: Crypto.randomUUID(), lines: cart, quote: activeQuote }))} />}
-            <Button label="Weiter einkaufen" secondary onPress={() => go("catalog")} />
-          </>}
-          {(screen === "review" || screen === "issue") && order && <>
-            {screen === "issue" ? <Message error>{issueMessage}</Message>
-              : changed && <Message>Der Auftrag hat sich geändert. Prüfe die aktuellen Positionen und Beträge vor der Bestätigung.</Message>}
-            <Card><Text style={styles.heading}>{order.customer_reference}</Text>{lines}</Card>
-            <TotalsView quote={order.totals} />
-            <Text style={styles.body}>Zahlung auf Rechnung{api.demo ? " · vereinbarte Testlieferung" : ""}</Text>
-            {order.reservation_expires_at && <Text style={styles.muted}>{orderExpired ? "Reservierung abgelaufen" : `Reserviert bis ${new Date(order.reservation_expires_at).toLocaleTimeString("de-DE", { hour: "2-digit", minute: "2-digit" })}`}</Text>}
-            {screen === "review" && <Button label="Verbindlich bestellen" disabled={busy || orderExpired || order.state !== "awaiting_confirmation" || order.allowed_actions?.includes("confirm") === false || !!pending}
-              onPress={() => void run(() => send({ kind: "confirm", order, key: Crypto.randomUUID() }))} />}
-            {cancelPrompt ? <Card>
-              <Text style={styles.body}>Die Reservierung wird freigegeben. Deine Auswahl bleibt im Warenkorb.</Text>
-              <Button label="Reservierung freigeben" disabled={busy} onPress={() => void run(() => send({ kind: "cancel", order, key: Crypto.randomUUID() }))} />
-              <Button label="Prüfung fortsetzen" secondary disabled={busy} onPress={() => setCancelPrompt(false)} />
-            </Card> : <Button label="Warenkorb bearbeiten" secondary disabled={busy || !!pending} onPress={() => setCancelPrompt(true)} />}
-            <Button label="Händler kontaktieren" secondary onPress={support} />
-          </>}
-          {screen === "pending" && <>
-            <Text style={styles.body}>Prüfe den Status, bevor du erneut bestellst. Der Vorgang bleibt gespeichert.</Text>
-            <Button label="Status prüfen" disabled={!pending || busy} onPress={checkPending} />
-            {canRepeat && pending && <Button label="Vorgang erneut senden" disabled={busy} secondary onPress={() => void run(() => send(pending))} />}
-            <Button label="Zu meinen Bestellungen" secondary onPress={() => go("orders")} />
-            <Button label="Händler kontaktieren" secondary onPress={support} />
-          </>}
-          {screen === "success" && order && <>
-            <Message>Deine Bestellnummer lautet {order.customer_reference}.</Message>
-            <TotalsView quote={order.totals} />
-            <Button label="Bestellung ansehen" onPress={() => openOrderDetail(order)} />
-            <Button label="Bestellnummer kopieren" secondary onPress={() => void run(async () => { await Clipboard.setStringAsync(order.customer_reference); setMessage("Bestellnummer kopiert."); })} />
-            <Button label="Weiter einkaufen" secondary onPress={() => go("catalog")} />
-          </>}
-          {screen === "orders" && <>
-            {pending && <Button label="Offenen Bestellvorgang prüfen" secondary onPress={() => go("pending")} />}
-            <View style={styles.row}>{(["all", "confirmed", "awaiting_confirmation", "on_hold", "cancelled"] as const).map((state) =>
-              <Button key={state} label={state === "all" ? "Alle" : statuses[state]} secondary={filter !== state} onPress={() => setFilter(state)} />)}</View>
-            {history.filter((value) => filter === "all" || value.state === filter).map((value) =>
-              <Button key={value.id} label={`${value.customer_reference} · ${statuses[value.state]} · ${euro(value.totals.total_cents)}`} secondary onPress={() => openOrderDetail(value)} />)}
-            {!loading && !history.some((value) => filter === "all" || value.state === filter) && <Text style={styles.muted}>Keine passenden Bestellungen.</Text>}
-            <Button label="Bestellungen aktualisieren" secondary onPress={() => setRefresh((n) => n + 1)} />
-          </>}
-          {screen === "order" && order && <>
-            <Card><Text style={styles.heading}>{order.customer_reference}</Text><Text style={styles.body}>{statuses[order.state] ?? "Status aktualisieren"}</Text>
-              <Text style={styles.muted}>{new Date(order.created_at).toLocaleDateString("de-DE")}</Text>{lines}</Card>
-            <TotalsView quote={order.totals} />
-            {order.state === "awaiting_confirmation" && order.allowed_actions?.includes("confirm") !== false && <Button label="Bestellung weiter prüfen" disabled={!!pending} onPress={() => { setDraftOrder(order); go("review"); }} />}
-            {order.invoice_available ? <Button label="Rechnung öffnen" disabled={busy} onPress={() => openInvoice(order)} /> : <Text style={styles.muted}>Rechnung noch nicht verfügbar.</Text>}
-            <Button label="Status aktualisieren" secondary disabled={busy} onPress={() => openOrderDetail(order)} />
-            <Button label="Händler zu dieser Bestellung kontaktieren" secondary onPress={support} />
-          </>}
-          {screen === "account" && <>
-            <Card><Text style={styles.heading}>{session.customerName}</Text><Text style={styles.body}>{session.merchantName}</Text></Card>
-            {api.demo && <Card><Text style={styles.heading}>Demo-Szenario</Text><View style={styles.row}>
-              {examples.map((item) => <Button key={item.id} label={item.label} secondary={scenario !== item.id} disabled={cartLocked} onPress={() => setScenario(item.id)} />)}
-            </View></Card>}
-            <Button label="Händler kontaktieren" secondary onPress={support} />
-            <Button label="Abmelden" secondary onPress={() => go("logout")} />
-          </>}
-          {screen === "logout" && <>
-            <Text style={styles.body}>Deine Bestellungen bleiben im Konto.{cart.length > 0 ? " Der lokale Warenkorb wird auf diesem Gerät gelöscht." : ""}</Text>
-            <Button label="Jetzt abmelden" disabled={busy} onPress={logout} />
-            <Button label="Angemeldet bleiben" secondary disabled={busy} onPress={() => go("account")} />
-          </>}
-          {screen === "support" && <>
-            <Text style={styles.heading}>{session.merchantName}</Text>
-            {(supportOrigin === "order" || supportOrigin === "review" || supportOrigin === "issue") && order && <Text style={styles.body}>Bestellung {order.customer_reference}</Text>}
-            {session.supportEmail ? <>
-              <Text style={styles.body}>{session.supportEmail}</Text>
-              <Button label="E-Mail schreiben" onPress={() => void run(async () => Linking.openURL(`mailto:${session.supportEmail}`))} />
-              <Button label="E-Mail-Adresse kopieren" secondary onPress={() => void run(async () => { await Clipboard.setStringAsync(session.supportEmail!); setMessage("Adresse kopiert."); })} />
-            </> : <Text style={styles.muted}>Händlerkontakt derzeit nicht verfügbar.</Text>}
-          </>}
+          {screen === "success" && order && <ConfirmationScreen order={order} viewOrder={() => openOrderDetail(order)}
+            copyReference={() => void run(async () => { await Clipboard.setStringAsync(order.customer_reference); setMessage("Bestellnummer kopiert."); })}
+            continueShopping={() => go("catalog")} />}
+          {screen === "orders" && <OrdersScreen pending={!!pending} history={history} filter={filter} loading={loading}
+            go={go} setFilter={setFilter} openOrderDetail={openOrderDetail} refresh={refreshView} />}
+          {screen === "order" && order && <OrderScreen order={order} busy={busy} pending={!!pending}
+            review={() => { setDraftOrder(order); go("review"); }} openInvoice={() => openInvoice(order)}
+            refresh={() => openOrderDetail(order)} support={support} />}
+          {screen === "account" && <AccountScreen session={session} demo={api.demo} scenario={scenario} cartLocked={cartLocked}
+            setScenario={setScenario} support={support} askLogout={() => go("logout")} />}
+          {screen === "logout" && <LogoutScreen hasCart={cart.length > 0} busy={busy} logout={logout}
+            staySignedIn={() => go("account")} />}
+          {screen === "support" && <SupportScreen session={session} order={order} supportOrigin={supportOrigin}
+            writeEmail={() => void run(async () => Linking.openURL(`mailto:${session.supportEmail}`))}
+            copyEmail={() => void run(async () => { await Clipboard.setStringAsync(session.supportEmail!); setMessage("Adresse kopiert."); })} />}
         </>}
       </ScrollView>
       {session && !["review", "pending", "issue", "success", "logout"].includes(screen) && <View accessibilityRole="tablist" style={layout.tabs}>
@@ -610,11 +455,6 @@ const layout = StyleSheet.create({
   badge: { color: colors.ink, backgroundColor: colors.lime, borderRadius: 12, paddingHorizontal: 10, paddingVertical: 4, fontWeight: "600" },
   scroll: { flex: 1 },
   content: { padding: 19, gap: 13, paddingBottom: 28 },
-  product: { borderWidth: 1, borderColor: colors.edge, backgroundColor: colors.paper, borderRadius: 15, padding: 13, flexDirection: "row", gap: 12, alignItems: "center" },
-  swatch: { backgroundColor: "#e8edda", width: 48, height: 48, borderRadius: 13, justifyContent: "center", alignItems: "center" },
-  heroImage: { width: "100%", height: 190, borderRadius: 11, backgroundColor: colors.canvas },
-  swatchText: { color: colors.moss, fontWeight: "800", fontSize: 14 },
-  productText: { flex: 1 },
   tabs: { flexDirection: "row", padding: 5, backgroundColor: colors.paper, borderTopWidth: 1, borderColor: colors.edge },
   tab: { flex: 1, minHeight: 48, justifyContent: "center", borderRadius: 10, paddingHorizontal: 3 },
   active: { backgroundColor: colors.lime },
