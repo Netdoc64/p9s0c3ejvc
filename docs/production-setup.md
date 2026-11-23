@@ -80,8 +80,7 @@ Reiter „Schlüssel“. Hier stehen nur die Namen.
 
 | Name | Art | Zweck |
 |---|---|---|
-| `CLOUDFLARE_API_TOKEN` | Secret | wrangler: Migrationen und Deploy; Rechte nur auf Workers, D1, KV, R2, Queues dieses Kontos |
-| `CLOUDFLARE_ACCOUNT_ID` | Secret | Konto, in dem deployt wird |
+| `CLOUDFLARE_API_TOKEN` | Secret | wrangler: Migrationen und Deploy; Rechte nur auf Workers, D1, KV, R2, Queues **genau eines** Kontos. Eine Konto-ID braucht es nicht: bei einem Token für genau ein Konto ermittelt wrangler es selbst, und die ID steht so in keinem öffentlichen Log |
 
 Sie werden im Environment `production` hinterlegt, nicht als Repository-Secret,
 damit nur der geprüfte Prod-Lauf sie sieht. Das Token ist ein eigenes für
@@ -150,7 +149,7 @@ Vorher mit `--list` ansehen, was ansteht:
 npx wrangler d1 migrations list DB --remote --env production
 ```
 
-Der Befehl braucht `CLOUDFLARE_API_TOKEN` und `CLOUDFLARE_ACCOUNT_ID` in der
+Der Befehl braucht `CLOUDFLARE_API_TOKEN` in der
 Umgebung des Terminals (aus dem Schlüsselspeicher, nicht aus einer Datei).
 Migrationen laufen vor dem Deploy und nie rückwärts; ein Fehler wird behoben,
 indem eine neue Migration mit der nächsten freien Nummer entsteht.
@@ -179,7 +178,7 @@ Nie lokal mit `wrangler deploy --env production` deployen.
 - [ ] D1 `grosshandel-prod` (weur), KV, R2 `grosshandel-assets-prod`, Queues `grosshandel-outbox-prod` und `-dlq` angelegt
 - [ ] Email Sending und DNS für die Absender-Domain eingerichtet
 - [ ] IDs per PR in `[env.production]` eingetragen und gemergt
-- [ ] `CLOUDFLARE_API_TOKEN`, `CLOUDFLARE_ACCOUNT_ID` im Environment `production`
+- [ ] `CLOUDFLARE_API_TOKEN` im Environment `production`
 - [ ] `MAIL_FROM` und `CUSTOMER_APP_ORIGINS` am Prod-Worker gesetzt
 - [ ] Environment `production` mit Pflicht-Review
 - [ ] `node scripts/check-prod-config.mjs` → Exit 0
