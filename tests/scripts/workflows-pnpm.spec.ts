@@ -22,6 +22,17 @@ describe("pnpm-Version in Workflows", () => {
     expect(Object.keys(workflows).length).toBeGreaterThan(0);
   });
 
+  it("Production-Deploy filtert jede wrangler-Ausgabe (öffentliche Logs)", () => {
+    const text = Object.entries(workflows).find(([p]) => p.endsWith("deploy-production.yml"))?.[1] ?? "";
+    const laeufe = text.split("\n").filter((z) => /run:.*wrangler /.test(z));
+    expect(laeufe.length).toBeGreaterThan(0);
+    for (const z of laeufe) {
+      expect(z).toContain("set -o pipefail");
+      expect(z).toContain("workers\\.dev#");
+      expect(z).toContain("<konto-id>");
+    }
+  });
+
   for (const [pfad, text] of Object.entries(workflows)) {
     it(`${pfad}: pnpm/action-setup ohne eigene version`, () => {
       const zeilen = text.split("\n");
