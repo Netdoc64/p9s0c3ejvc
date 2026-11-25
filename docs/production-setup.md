@@ -126,6 +126,9 @@ Key dieser Herkunft (Name `business-manager`); eine neue Ausgabe dreht ihn, der
 alte gilt noch 24 Stunden. Das ist der Vertrag des Zieltyps „remote-mint“ im
 Schlüsselspeicher: er ruft an, verwahrt den Wert und verteilt ihn weiter.
 
+`GET /admin/tenants` (gleicher Schlüssel) ist die Selbstauskunft für den
+Vorflug: Slug als `id`, dazu Name und Status, sonst nichts.
+
 ## 4. GitHub-Environment `production`
 
 Einstellungen → Environments → *New environment* → Name **`production`**:
