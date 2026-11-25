@@ -22,8 +22,9 @@ describe("pnpm-Version in Workflows", () => {
     expect(Object.keys(workflows).length).toBeGreaterThan(0);
   });
 
-  it("Production-Deploy filtert jede wrangler-Ausgabe (öffentliche Logs)", () => {
-    const text = Object.entries(workflows).find(([p]) => p.endsWith("deploy-production.yml"))?.[1] ?? "";
+  it.each(["deploy-production.yml", "deploy-staging.yml"])("%s filtert jede wrangler-Ausgabe (öffentliche Logs)", (datei) => {
+    const text = Object.entries(workflows).find(([p]) => p.endsWith(datei))?.[1] ?? "";
+    expect(text).not.toContain("CLOUDFLARE_ACCOUNT_ID");
     const laeufe = text.split("\n").filter((z) => /run:.*wrangler /.test(z));
     expect(laeufe.length).toBeGreaterThan(0);
     for (const z of laeufe) {
