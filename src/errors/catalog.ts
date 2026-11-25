@@ -128,6 +128,11 @@ export const ERROR_CATALOG = {
   // OBS
   "GH-OBS-001": { code: "GH-OBS-001", http_status: 0, category: "server_error", retry: "none", user_message: "(intern)", internal_detail: "Logging sink unreachable; fail-open with worker-logs backup", status: "active" },
 
+  // ADMIN — Betriebs-Endpunkte für den Business Manager (/admin/*)
+  "GH-ADMIN-001": { code: "GH-ADMIN-001", http_status: 401, category: "client_error", retry: "none", user_message: "Authentifizierung fehlgeschlagen.", internal_detail: "X-Admin-Key missing or wrong", status: "active" },
+  "GH-ADMIN-002": { code: "GH-ADMIN-002", http_status: 503, category: "server_error", retry: "manual", user_message: "(intern)", internal_detail: "ADMIN_API_KEY not configured on this worker; admin endpoints are off", status: "active" },
+  "GH-ADMIN-003": { code: "GH-ADMIN-003", http_status: 409, category: "client_error", retry: "none", user_message: "(intern)", internal_detail: "Idempotency-Key already used for an issuance; the value is not handed out again", status: "active" },
+
   // SECRET
   "GH-SECRET-001": { code: "GH-SECRET-001", http_status: 409, category: "server_error", retry: "none", user_message: "(intern)", internal_detail: "Secret rotation conflict or generation failure", status: "active" },
 

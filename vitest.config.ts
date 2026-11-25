@@ -19,6 +19,7 @@ export default defineWorkersConfig({
           bindings: {
             TEST_MIGRATIONS: migrations,
             CUSTOMER_APP_ORIGINS: "https://app.pilot.example",
+            ADMIN_API_KEY: "test-admin-key-0123456789abcdef0123456789abcdef",
           },
         },
       },

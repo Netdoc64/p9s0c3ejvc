@@ -1,6 +1,7 @@
 import { Hono } from "hono";
 import type { AppContext, Env, OutboxMessage } from "./env";
 import { healthRoutes } from "./routes/health";
+import { adminRoutes } from "./routes/admin";
 import { customersRoutes } from "./routes/customers";
 import { suppliersRoutes } from "./routes/suppliers";
 import { productsRoutes } from "./routes/products";
@@ -53,6 +54,9 @@ app.notFound((c) => {
 
 // /health bleibt unauthentifiziert
 app.route("/", healthRoutes);
+
+// Betriebs-Endpunkte für den Business Manager (eigener Schlüssel, kein Tenant)
+app.route("/admin", adminRoutes);
 
 // OpenAPI 3.1 Spec + Schema-Exports (öffentlich für SDK-Generierung)
 app.route("/", docsRoutes);
