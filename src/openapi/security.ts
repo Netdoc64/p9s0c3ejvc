@@ -19,7 +19,13 @@ export function registerSecuritySchemes(app: OpenAPIHono<AppContext>): void {
     bearerFormat: "JWT",
     description: "Customer-JWT (HS256, per-Tenant-Secret) aus /v1/auth/magic-link/verify oder /v1/auth/oauth/token.",
   });
+  app.openAPIRegistry.registerComponent("securitySchemes", "staff_jwt", {
+    type: "http",
+    scheme: "bearer",
+    bearerFormat: "JWT",
+    description: "Mitarbeiter-Token aus /v1/auth/staff/code/verify (Händler-Dashboard). Gilt für /v1/*, nie für /v1/customer/*.",
+  });
 }
 
-export const TENANT_AUTH = [{ tenant_hmac: [] }];
+export const TENANT_AUTH: Array<Record<string, string[]>> = [{ tenant_hmac: [] }, { staff_jwt: [] }];
 export const CUSTOMER_AUTH = [{ customer_jwt: [] }];

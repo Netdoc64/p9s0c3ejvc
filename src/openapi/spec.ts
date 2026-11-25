@@ -137,7 +137,9 @@ const StepTypeJson = toSchema(StepTypeSchema, "StepType");
 
 // ---------- Helpers ----------
 
-const TENANT_AUTH = [{ tenant_hmac: [] }];
+// Tenant-Bereich: API-Key+HMAC ODER Mitarbeiter-Token (Händler-Dashboard).
+const TENANT_AUTH: Array<Record<string, string[]>> = [{ tenant_hmac: [] }, { staff_jwt: [] }];
+const STAFF_AUTH = [{ staff_jwt: [] }];
 const CUSTOMER_AUTH = [{ customer_jwt: [] }];
 
 const IDEMPOTENCY_HEADER = {
@@ -585,6 +587,115 @@ paths["/v1/stock/batches"] = {
   },
 };
 
+// STAFF (Händler-Dashboard)
+const StaffJson = {
+  type: "object",
+  required: ["id", "email", "role"],
+  properties: {
+    id: { type: "string", pattern: "^stf_" },
+    email: { type: "string", format: "email" },
+    role: { type: "string", enum: ["owner", "staff"] },
+    created_at: { type: "string", format: "date-time" },
+    disabled_at: { type: ["string", "null"], format: "date-time" },
+  },
+};
+
+paths["/v1/auth/staff/code/request"] = {
+  post: {
+    tags: ["auth"], summary: "Mitarbeiter: Anmelde-Code anfordern",
+    description: "Schickt einen 8-stelligen Code (10 min gültig) an die Adresse, wenn sie als aktiver Mitarbeiter des Tenants eingetragen ist. Antwort immer gleich (keine Enumeration).",
+    operationId: "staffCodeRequest",
+    parameters: [TENANT_SLUG_HEADER],
+    requestBody: { required: true, content: { "application/json": { schema: { type: "object", required: ["email"], properties: { email: { type: "string", format: "email" } } } } } },
+    responses: {
+      ...Object.fromEntries([JSON_RESPONSE("Akzeptiert", { type: "object", properties: { ok: { type: "boolean" }, ttl_sec: { type: "integer" } } })]),
+      400: PROBLEM_RESPONSE("Validation"), 404: PROBLEM_RESPONSE("Tenant unbekannt"),
+      429: PROBLEM_RESPONSE("Rate-Limit (3 je Minute)"), 503: PROBLEM_RESPONSE("GH-EXT-003: kein Mail-Versand konfiguriert"),
+    },
+  },
+};
+
+paths["/v1/auth/staff/code/verify"] = {
+  post: {
+    tags: ["auth"], summary: "Mitarbeiter: Code einlösen",
+    description: "Tauscht Adresse+Code gegen ein Mitarbeiter-Token. Ein Code gilt einmal; nach 5 Fehlversuchen ist er verbraucht.",
+    operationId: "staffCodeVerify",
+    parameters: [TENANT_SLUG_HEADER],
+    requestBody: { required: true, content: { "application/json": { schema: { type: "object", required: ["email", "code"], properties: { email: { type: "string", format: "email" }, code: { type: "string", minLength: 8, maxLength: 8 } } } } } },
+    responses: {
+      ...Object.fromEntries([JSON_RESPONSE("Mitarbeiter-Token", {
+        type: "object",
+        required: ["access_token", "token_type", "expires_in", "tenant_id", "role", "roles"],
+        properties: {
+          access_token: { type: "string" },
+          token_type: { type: "string", enum: ["Bearer"] },
+          expires_in: { type: "integer", example: 28800 },
+          tenant_id: { type: "string", pattern: "^t_" },
+          role: { type: "string", enum: ["owner", "staff"] },
+          roles: { type: "array", items: { type: "string", enum: ["owner", "staff"] } },
+        },
+      })]),
+      400: PROBLEM_RESPONSE("Validation"),
+      410: PROBLEM_RESPONSE("GH-AUTH-006: Code ungültig, abgelaufen, schon eingelöst oder zu viele Versuche"),
+      429: PROBLEM_RESPONSE("Rate-Limit (5 je Minute)"),
+    },
+  },
+};
+
+paths["/v1/staff"] = {
+  get: {
+    tags: ["staff"], security: TENANT_AUTH, summary: "Mitarbeiter des Tenants auflisten", operationId: "listStaff",
+    responses: { 200: { description: "Liste", content: { "application/json": { schema: { type: "object", properties: { data: { type: "array", items: StaffJson } } } } } }, 401: PROBLEM_RESPONSE("Anmeldung fehlt oder abgelaufen (GH-AUTH-001/002/005)") },
+  },
+  post: {
+    tags: ["staff"], security: TENANT_AUTH, summary: "Mitarbeiter anlegen (nur Inhaber)", operationId: "addStaff",
+    requestBody: { required: true, content: { "application/json": { schema: { type: "object", required: ["email"], properties: { email: { type: "string", format: "email" }, role: { type: "string", enum: ["owner", "staff"], default: "staff" } } } } } },
+    responses: { 201: { description: "Angelegt", content: { "application/json": { schema: StaffJson } } }, 403: PROBLEM_RESPONSE("GH-AUTH-004: nur Inhaber"), 409: PROBLEM_RESPONSE("GH-STAFF-001: Adresse schon eingetragen") },
+  },
+};
+
+paths["/v1/staff/me"] = {
+  get: {
+    tags: ["staff"], security: STAFF_AUTH, summary: "Eigenes Mitarbeiter-Profil", operationId: "getStaffMe",
+    responses: { 200: { description: "Profil", content: { "application/json": { schema: StaffJson } } }, 403: PROBLEM_RESPONSE("Kein Mitarbeiter-Token (z.B. API-Key)") },
+  },
+};
+
+paths["/v1/staff/{id}"] = {
+  delete: {
+    tags: ["staff"], security: TENANT_AUTH, summary: "Mitarbeiter sperren (nur Inhaber, wirkt sofort)", operationId: "disableStaff",
+    parameters: [{ name: "id", in: "path", required: true, schema: { type: "string", pattern: "^stf_" } }],
+    responses: { 204: { description: "Gesperrt" }, 403: PROBLEM_RESPONSE("GH-AUTH-004: nur Inhaber"), 404: PROBLEM_RESPONSE("Nicht gefunden"), 409: PROBLEM_RESPONSE("GH-STAFF-002: sich selbst sperren") },
+  },
+};
+
+paths["/v1/stock/overview"] = {
+  get: {
+    tags: ["stock"], security: TENANT_AUTH,
+    summary: "Bestandsübersicht (alle Lager × Artikel mit Bewegungen)",
+    description: "Seitenweise, höchstens 50 je Seite. Eine leere Liste ist 200; fehlende Anmeldung ist 401, fehlende Rolle 403 — nie eine leere Liste.",
+    operationId: "getStockOverview",
+    parameters: [
+      { name: "warehouse_id", in: "query", required: false, schema: { type: "string", pattern: "^wh_" } },
+      { name: "cursor", in: "query", required: false, schema: { type: "string" } },
+      { name: "limit", in: "query", required: false, schema: { type: "integer", minimum: 1, maximum: 50, default: 50 } },
+    ],
+    responses: {
+      ...Object.fromEntries([JSON_RESPONSE("Seite", {
+        type: "object", required: ["items", "next_cursor"],
+        properties: {
+          items: { type: "array", items: { type: "object", required: ["warehouse_id", "sku_id", "available", "reserved"], properties: {
+            warehouse_id: { type: "string", pattern: "^wh_" }, sku_id: { type: "string", pattern: "^sku_" },
+            available: { type: "integer" }, reserved: { type: "integer" },
+          } } },
+          next_cursor: { type: ["string", "null"] },
+        },
+      })]),
+      400: PROBLEM_RESPONSE("Ungültiger Parameter oder Cursor"), 401: PROBLEM_RESPONSE("Anmeldung fehlt"),
+    },
+  },
+};
+
 // ORDERS
 paths["/v1/orders"] = {
   post: {
@@ -611,7 +722,13 @@ paths["/v1/orders"] = {
       { name: "cursor", in: "query", required: false, schema: { type: "string" } },
       { name: "limit", in: "query", required: false, schema: { type: "integer", minimum: 1, maximum: 200 } },
     ],
-    responses: { 200: { description: "Liste", content: { "application/json": { schema: { type: "object", properties: { items: { type: "array" }, next_cursor: { type: ["string", "null"] } } } } } } },
+    responses: { 200: { description: "Liste", content: { "application/json": { schema: { type: "object", required: ["items", "next_cursor"], properties: {
+      items: { type: "array", items: { type: "object", required: ["id", "customer_id", "state", "total_cents", "currency", "created_at"], properties: {
+        id: { type: "string", pattern: "^ord_" }, customer_id: { type: "string", pattern: "^cust_" }, state: OrderStateJson,
+        total_cents: { type: "integer" }, currency: { type: "string", minLength: 3, maxLength: 3 }, created_at: { type: "string", format: "date-time" },
+      } } },
+      next_cursor: { type: ["string", "null"] },
+    } } } } } },
   },
 };
 
@@ -1321,6 +1438,7 @@ export function buildOpenApiDocument(opts: OpenApiDocOptions = {}): JsonSchema {
       { name: "invoices", description: "Rechnungen (PDF in R2)" },
       { name: "webhooks", description: "Webhook-Subscriptions für Tenant-ERP-Integration" },
       { name: "customer-self", description: "Endkunden-Self-Service (JWT-authenticated)" },
+      { name: "staff", description: "Mitarbeiter des Händler-Dashboards" },
       { name: "mcp", description: "Model Context Protocol für AI-Agents" },
     ],
     components: {
@@ -1336,6 +1454,12 @@ export function buildOpenApiDocument(opts: OpenApiDocOptions = {}): JsonSchema {
           scheme: "bearer",
           bearerFormat: "JWT",
           description: "Customer-JWT (HS256, per-Tenant-Secret).",
+        },
+        staff_jwt: {
+          type: "http",
+          scheme: "bearer",
+          bearerFormat: "JWT",
+          description: "Mitarbeiter-Token aus /v1/auth/staff/code/verify (aud grosshandel.staff, 8 h, kein Refresh). Gilt für den Tenant-Bereich /v1/*, nie für /v1/customer/*. Gesperrte Mitarbeiter sind sofort draußen (401).",
         },
       },
       schemas: {
