@@ -1,6 +1,7 @@
 name: Mobile
 
 on:
+  workflow_dispatch:
   pull_request:
     branches: [main]
   push:
@@ -82,3 +83,84 @@ jobs:
 
       - name: Browser-Smoke mit lokalem Worker
         run: node scripts/test-mobile-local.mjs
+
+  deploy-pages:
+    name: Kunden-App auf Pages
+    needs: mobile-checks
+    if: github.event_name == 'workflow_dispatch' && github.ref == 'refs/heads/main'
+    environment: production
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    concurrency:
+      group: production-customer-pages
+      cancel-in-progress: false
+    env:
+      WRANGLER_SEND_METRICS: 'false'
+      EXPO_NO_TELEMETRY: '1'
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
+        with:
+          persist-credentials: false
+
+      - uses: pnpm/action-setup@b906affcce14559ad1aafd4ab0e942779e9f58b1 # v4.3.0
+      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4.4.0
+        with:
+          node-version: 22
+
+      - name: Abhängigkeiten für Expo und Wrangler installieren
+        run: |
+          npm ci --prefix mobile
+          pnpm install --frozen-lockfile
+
+      # Actions protokolliert Step-Variablen vor dem ersten Shell-Befehl.
+      # Den kanonischen Ursprung über das Worker-Konto bestimmen, maskieren und
+      # mit der Environment-Variable vergleichen, bevor Expo ihn bekommt.
+      - name: Cloudflare-Konto im öffentlichen Protokoll maskieren
+        id: cloudflare
+        env:
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          account=$(pnpm exec wrangler whoami --json 2>/dev/null | jq -er '.accounts | select(length == 1) | .[0].id')
+          [[ "$account" =~ ^[[:xdigit:]]{32}$ ]]
+          echo "::add-mask::$account"
+          subdomain=$(curl --fail --silent --show-error \
+            -H "Authorization: Bearer $CLOUDFLARE_API_TOKEN" \
+            "https://api.cloudflare.com/client/v4/accounts/$account/workers/subdomain" |
+            jq -er '.result.subdomain')
+          [[ "$subdomain" =~ ^[a-z0-9-]+$ ]]
+          worker=$(python3 - <<'PY'
+          import tomllib
+          with open("wrangler.toml", "rb") as f:
+              config = tomllib.load(f)
+          print(config["env"]["production"].get("name", config["name"] + "-production"))
+          PY
+          )
+          [[ "$worker" =~ ^[a-z0-9-]+$ ]]
+          host="$worker.$subdomain.workers.dev"
+          echo "::add-mask::$host"
+          echo "origin=https://$host" >> "$GITHUB_OUTPUT"
+
+      - name: Production-Variable prüfen
+        if: >-
+          vars.GROSSHANDEL_API_URL != steps.cloudflare.outputs.origin &&
+          vars.GROSSHANDEL_API_URL != format('{0}/', steps.cloudflare.outputs.origin)
+        run: |
+          echo "::error::GROSSHANDEL_API_URL muss auf den Production-Worker dieses Kontos zeigen."
+          exit 1
+
+      - name: Kunden-App mit Production-API bauen
+        working-directory: mobile
+        env:
+          EXPO_PUBLIC_API_URL: ${{ steps.cloudflare.outputs.origin }}
+        run: npm run build:web
+
+      - name: Web-Build nach Pages ausrollen
+        env:
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          pnpm exec wrangler pages deploy mobile/dist --project-name grosshandel-app --branch main 2>&1 |
+            sed -E -e 's#([a-z0-9-]+\.)+(workers|pages)\.dev#<cloudflare-host>#gI' -e 's#\b[0-9a-f]{32}\b#<konto-id>#gI'
