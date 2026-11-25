@@ -26,6 +26,20 @@ adminRoutes.use("*", async (c, next) => {
 });
 
 /**
+ * Selbstauskunft für den Vorflug des Business Managers: welche Tenants es hier
+ * gibt. `id` ist der Slug — derselbe, der im Pfad der Ausgabe-Route steht und
+ * gegen den der Manager sein Ziel ausweist. Nur Bezeichner und Zustand, keine
+ * Kundendaten, kein Geheimnis.
+ */
+adminRoutes.get("/tenants", async (c) => {
+  const rows = await c.env.DB.prepare(
+    "SELECT slug, name, status FROM tenants WHERE deleted_at IS NULL ORDER BY slug LIMIT 2000",
+  ).all<{ slug: string; name: string; status: string }>();
+  c.header("Cache-Control", "no-store");
+  return c.json({ tenants: (rows.results ?? []).map((r) => ({ id: r.slug, name: r.name, status: r.status })) });
+});
+
+/**
  * Vertrag „remote-mint“ des Business Managers:
  *   POST, Header `Idempotency-Key`, Body `{ env_var, idempotency_key }`.
  *   200 → `{ value, fingerprint }` (fingerprint = sha256(value) hex, 12 Zeichen)

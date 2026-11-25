@@ -110,6 +110,17 @@ describe("POST /admin/tenants/:slug/api-keys (remote-mint des Business Managers)
     expect(ohne?.n).toBe(0);
   });
 
+  it("GET /admin/tenants: Selbstauskunft mit Slug als id, nur mit X-Admin-Key", async () => {
+    const ohne = await SELF.fetch("https://example.com/admin/tenants");
+    expect(ohne.status).toBe(401);
+    const res = await SELF.fetch("https://example.com/admin/tenants", { headers: { "X-Admin-Key": ADMIN } });
+    expect(res.status).toBe(200);
+    const body = (await res.json()) as { tenants: Array<Record<string, unknown>> };
+    const eintrag = body.tenants.find((x) => x.id === "mint-a");
+    expect(eintrag).toMatchObject({ id: "mint-a", status: "active" });
+    expect(Object.keys(eintrag ?? {}).sort()).toEqual(["id", "name", "status"]);
+  });
+
   it("zwei gleichzeitige Aufrufe mit demselben Schlüssel: genau einer bekommt einen Wert", async () => {
     const results = await Promise.allSettled([
       issueTenantKey(env as never, "mint-a", "v-7"),
