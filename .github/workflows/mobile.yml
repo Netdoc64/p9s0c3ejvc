@@ -68,6 +68,15 @@ jobs:
             --retry 10 --retry-connrefused --retry-delay 1 "$PILOT_SMOKE_URL"
           npm run test:browser
 
+      - name: Händler-Dashboard im Browser prüfen
+        working-directory: mobile
+        run: |
+          python3 -m http.server 8082 --bind 127.0.0.1 --directory admin &
+          server_pid=$!
+          trap 'kill "$server_pid" 2>/dev/null || true' EXIT
+          curl -fsS --retry 10 --retry-connrefused --retry-delay 1 -o /dev/null http://127.0.0.1:8082/
+          node tests/admin-smoke.mjs
+
       - name: Worker-Abhängigkeiten installieren
         run: pnpm install --frozen-lockfile
 
