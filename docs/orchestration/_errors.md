@@ -250,6 +250,14 @@ diese als TypeScript-Const-Map (`src/errors/catalog.ts`, generiert aus dieser Da
 |-----------------|------|--------|---------------------------------------|------------------------------------------|
 | `GH-OBS-001`    | —    | none   | (intern)                              | Logging sink unreachable; fail-open with worker-logs backup |
 
+### ADMIN
+
+| code            | http | retry  | user_message                          | internal_detail                          |
+|-----------------|------|--------|---------------------------------------|------------------------------------------|
+| `GH-ADMIN-001`  | 401  | none   | Authentifizierung fehlgeschlagen.     | X-Admin-Key missing or wrong |
+| `GH-ADMIN-002`  | 503  | manual | (intern)                              | ADMIN_API_KEY not configured on this worker; admin endpoints are off |
+| `GH-ADMIN-003`  | 409  | none   | (intern)                              | Idempotency-Key already used for an issuance; the value is not handed out again |
+
 ### SECRET
 
 | code            | http | retry  | user_message                          | internal_detail                          |

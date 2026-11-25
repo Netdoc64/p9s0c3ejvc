@@ -30,6 +30,10 @@ export interface Env {
   // GH-EXT-003 statt „ok“.
   EMAIL?: import("./auth/email").SendEmailBinding;
   MAIL_FROM?: string;
+
+  // Schlüssel für /admin/* (nur Business Manager). Fehlt er, sind die
+  // Admin-Endpunkte aus (GH-ADMIN-002), nicht offen.
+  ADMIN_API_KEY?: string;
 }
 
 export interface OutboxMessage {

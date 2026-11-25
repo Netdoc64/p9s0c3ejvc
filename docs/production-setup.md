@@ -99,6 +99,7 @@ braucht; optional sind die Lieferanten-Anbindungen.
 | `KOMANDER_CONNECTIONS` | nein | Variable | Lieferanten-Anbindung |
 | `FLEUROP_NL_CONNECTIONS` | nein | Variable | Lieferanten-Anbindung |
 | `FSN_CONNECTIONS` | nein | Variable | Lieferanten-Anbindung |
+| `ADMIN_API_KEY` | nein | Secret | Schlüssel für `/admin/*` (nur der Schlüsselspeicher ruft das). Fehlt er, sind die Admin-Endpunkte aus (503), nicht offen. Mindestens 32 Zeichen |
 
 `ENVIRONMENT` und `WORKER_VERSION` stehen in `wrangler.toml`, `GIT_COMMIT`
 setzt der Deploy-Workflow selbst. Weitere Secrets, die ein Lieferant oder eine
@@ -106,6 +107,24 @@ Integration verlangt, stehen in `docs/supplier-integrations.md`.
 
 Die Verteilung selbst (Prägen, Planen, Verteilen) macht ein Mensch im
 Schlüsselspeicher; ein Agent bereitet höchstens Plan und Vorflug vor.
+
+### Tenant-API-Keys ohne Klartext
+
+`scripts/bootstrap-tenant.ts` gibt API-Key und HMAC-Geheimnis im Klartext im
+Terminal aus. Für einen echten Tenant gibt es deshalb einen zweiten Weg:
+
+```
+POST /admin/tenants/<slug>/api-keys
+X-Admin-Key: <ADMIN_API_KEY>
+Idempotency-Key: <eindeutig je Vorgang>
+```
+
+Die Antwort trägt `value` (`<api_key>.<hmac_secret>`, getrennt am ersten Punkt)
+und `fingerprint` (sha256 hex, 12 Zeichen) **genau einmal**. Derselbe
+Idempotency-Key ein zweites Mal ergibt 409 ohne Wert. Je Tenant gibt es einen
+Key dieser Herkunft (Name `business-manager`); eine neue Ausgabe dreht ihn, der
+alte gilt noch 24 Stunden. Das ist der Vertrag des Zieltyps „remote-mint“ im
+Schlüsselspeicher: er ruft an, verwahrt den Wert und verteilt ihn weiter.
 
 ## 4. GitHub-Environment `production`
 
