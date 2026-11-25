@@ -133,6 +133,10 @@ export const ERROR_CATALOG = {
   "GH-ADMIN-002": { code: "GH-ADMIN-002", http_status: 503, category: "server_error", retry: "manual", user_message: "(intern)", internal_detail: "ADMIN_API_KEY not configured on this worker; admin endpoints are off", status: "active" },
   "GH-ADMIN-003": { code: "GH-ADMIN-003", http_status: 409, category: "client_error", retry: "none", user_message: "(intern)", internal_detail: "Idempotency-Key already used for an issuance; the value is not handed out again", status: "active" },
 
+  // STAFF — Mitarbeiter des Händler-Dashboards
+  "GH-STAFF-001": { code: "GH-STAFF-001", http_status: 409, category: "client_error", retry: "none", user_message: "Diese Adresse ist bereits als Mitarbeiter eingetragen.", internal_detail: "Duplicate staff email per tenant", status: "active" },
+  "GH-STAFF-002": { code: "GH-STAFF-002", http_status: 409, category: "client_error", retry: "none", user_message: "Du kannst dich nicht selbst sperren.", internal_detail: "Staff tried to disable own account", status: "active" },
+
   // SECRET
   "GH-SECRET-001": { code: "GH-SECRET-001", http_status: 409, category: "server_error", retry: "none", user_message: "(intern)", internal_detail: "Secret rotation conflict or generation failure", status: "active" },
 

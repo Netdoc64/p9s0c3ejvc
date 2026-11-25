@@ -19,6 +19,8 @@ export interface Env {
   GIT_COMMIT?: string;
   /** Komma-Liste der Web-Origins der Kunden-App, für die /v1/customer/* CORS bekommt. */
   CUSTOMER_APP_ORIGINS?: string;
+  /** Komma-Liste der Web-Origins des Händler-Dashboards (CORS für /v1/* mit Mitarbeiter-Token). */
+  STAFF_APP_ORIGINS?: string;
   FLORIDAY_CONNECTIONS?: string;
   KOMANDER_CONNECTIONS?: string;
   FLEUROP_NL_CONNECTIONS?: string;
@@ -67,4 +69,6 @@ export interface AppVariables {
   api_key_id?: string;
   customer_id?: string;
   scopes?: string[];
+  staff_id?: string;
+  staff_role?: "owner" | "staff";
 }

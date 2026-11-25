@@ -10,6 +10,7 @@ import type { AppContext } from "../env";
 import { CodedError } from "../errors/catalog";
 import { sha256Hex, constantTimeEqualHex } from "../lib/crypto";
 import { issueTenantKey } from "../services/api-key-issuance";
+import { addStaff } from "../auth/staff";
 
 export const MIN_ADMIN_KEY_LENGTH = 32;
 
@@ -58,4 +59,20 @@ adminRoutes.post("/tenants/:slug/api-keys", async (c) => {
   const issued = await issueTenantKey(c.env, slug, key);
   c.header("Cache-Control", "no-store");
   return c.json(issued);
+});
+
+/**
+ * Ersten Inhaber eines Tenants anlegen (danach verwaltet er seine Leute selbst
+ * über /v1/staff). Kein Geheimnis im Spiel: angemeldet wird per Mail-Code.
+ */
+adminRoutes.post("/tenants/:slug/staff", async (c) => {
+  const slug = c.req.param("slug");
+  const body = (await c.req.json().catch(() => ({}))) as { email?: unknown; role?: unknown };
+  if (typeof body.email !== "string" || !/^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(body.email) || body.email.length > 160) {
+    throw new CodedError("GH-INPUT-001", { reason: "email" });
+  }
+  const role = body.role === "staff" ? "staff" : "owner";
+  const tenant = await c.env.DB.prepare("SELECT id FROM tenants WHERE slug = ? AND deleted_at IS NULL AND status = 'active'").bind(slug).first<{ id: string }>();
+  if (!tenant) throw new CodedError("GH-TENANT-001");
+  return c.json(await addStaff(c.env, tenant.id, body.email, role), 201);
 });

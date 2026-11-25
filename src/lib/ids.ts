@@ -25,6 +25,7 @@ export const ID_PREFIXES = {
   return_case: "rtc_",
   return_line: "rtl_",
   return_handoff: "rth_",
+  staff: "stf_",
 } as const;
 
 export type IdKind = keyof typeof ID_PREFIXES;

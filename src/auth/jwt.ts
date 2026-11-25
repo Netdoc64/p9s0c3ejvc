@@ -80,6 +80,7 @@ export async function verifyJwt(
   token: string,
   secret: string | JwtSecretSet,
   expectedTenantId?: string,
+  expectedAud: string = "grosshandel.api",
 ): Promise<VerifyResult | VerifyError> {
   const parts = token.split(".");
   if (parts.length !== 3) return { ok: false, reason: "malformed" };
@@ -108,7 +109,7 @@ export async function verifyJwt(
   let payload: JwtPayload;
   try { payload = JSON.parse(new TextDecoder().decode(base64urlDecode(p))) as JwtPayload; } catch { return { ok: false, reason: "malformed" }; }
 
-  if (payload.aud !== "grosshandel.api") return { ok: false, reason: "wrong_aud" };
+  if (payload.aud !== expectedAud) return { ok: false, reason: "wrong_aud" };
   if (expectedTenantId && payload.tenant_id !== expectedTenantId) return { ok: false, reason: "wrong_tenant" };
   // Issuer-Pin (#A-003): erwarteter Issuer = `tenants:<id>`. Schützt gegen Cross-Issuer-Reuse.
   if (expectedTenantId && payload.iss !== `tenants:${expectedTenantId}`) return { ok: false, reason: "wrong_iss" };
