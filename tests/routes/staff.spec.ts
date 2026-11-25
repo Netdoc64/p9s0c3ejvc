@@ -3,6 +3,7 @@ import { afterEach, beforeEach, describe, expect, it } from "vitest";
 import { resetEmailAdapter, setEmailAdapter } from "../../src/auth/email";
 import { issueTokenPair } from "../../src/auth/token-issuance";
 import { requestStaffCode, verifyStaffCode } from "../../src/auth/staff";
+import * as stockSvc from "../../src/services/stock";
 import { clearTenants, seedTenant, type SeededTenant } from "../_setup/seed";
 
 const ADMIN = (env as unknown as { ADMIN_API_KEY: string }).ADMIN_API_KEY;
@@ -131,5 +132,40 @@ describe("Mitarbeiter-Anmeldung", () => {
     expect((await pre("/v1/customers", "https://admin.pilot.example")).headers.get("Access-Control-Allow-Origin")).toBe("https://admin.pilot.example");
     expect((await pre("/v1/customers", "https://boese.example")).headers.get("Access-Control-Allow-Origin")).toBeNull();
     expect((await pre("/v1/customer/me", "https://admin.pilot.example")).headers.get("Access-Control-Allow-Origin")).toBeNull();
+  });
+});
+
+describe("Dashboard-Verträge (#34)", () => {
+  it("Einlösen liefert tenant_id und roles", async () => {
+    await addViaAdmin("chef@firma.example");
+    await post("/v1/auth/staff/code/request", { email: "chef@firma.example" });
+    const code = /Anmelde-Code: (\w{8})/.exec(mails.at(-1)?.text ?? "")?.[1];
+    const body = (await (await post("/v1/auth/staff/code/verify", { email: "chef@firma.example", code })).json()) as Record<string, unknown>;
+    expect(body).toMatchObject({ tenant_id: t.tenant_id, role: "owner", roles: ["owner"], token_type: "Bearer" });
+  });
+
+  it("Bestandsübersicht: leer ist 200, danach seitenweise mit Cursor, ohne Anmeldung 401", async () => {
+    await addViaAdmin("chef@firma.example");
+    const tok = await login("chef@firma.example");
+    const leer = await SELF.fetch(`${BASE}/v1/stock/overview`, { headers: bearer(tok) });
+    expect(leer.status).toBe(200);
+    expect(await leer.json()).toEqual({ items: [], next_cursor: null });
+    expect((await SELF.fetch(`${BASE}/v1/stock/overview`)).status).toBe(401);
+
+    const E = env as never;
+    for (const sku of ["sku_a", "sku_b", "sku_c"]) {
+      await stockSvc.adjust(E, { tenant_id: t.tenant_id, warehouse_id: "wh_1", sku_id: sku, qty_delta: 5, reason: "test" });
+    }
+    const s1 = (await (await SELF.fetch(`${BASE}/v1/stock/overview?limit=2`, { headers: bearer(tok) })).json()) as { items: Array<Record<string, unknown>>; next_cursor: string | null };
+    expect(s1.items).toEqual([
+      { warehouse_id: "wh_1", sku_id: "sku_a", available: 5, reserved: 0 },
+      { warehouse_id: "wh_1", sku_id: "sku_b", available: 5, reserved: 0 },
+    ]);
+    expect(s1.next_cursor).toBeTruthy();
+    const s2 = (await (await SELF.fetch(`${BASE}/v1/stock/overview?limit=2&cursor=${s1.next_cursor}`, { headers: bearer(tok) })).json()) as { items: Array<Record<string, unknown>>; next_cursor: string | null };
+    expect(s2.items.map((i) => i.sku_id)).toEqual(["sku_c"]);
+    expect(s2.next_cursor).toBeNull();
+    expect((await SELF.fetch(`${BASE}/v1/stock/overview?limit=51`, { headers: bearer(tok) })).status).toBe(400);
+    await env.DB.prepare("DELETE FROM stock_movements").run();
   });
 });

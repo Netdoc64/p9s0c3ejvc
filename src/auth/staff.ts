@@ -67,7 +67,7 @@ export async function requestStaffCode(env: Env, tenant_id: string, emailRaw: st
 }
 
 /** Code einlösen → Zugriffstoken. Jeder Fehlversuch zählt, ab MAX_ATTEMPTS ist der Code tot. */
-export async function verifyStaffCode(env: Env, tenant_id: string, emailRaw: string, code: string): Promise<{ access_token: string; token_type: "Bearer"; expires_in: number; role: StaffRole }> {
+export async function verifyStaffCode(env: Env, tenant_id: string, emailRaw: string, code: string): Promise<{ access_token: string; token_type: "Bearer"; expires_in: number; tenant_id: string; role: StaffRole; roles: string[] }> {
   const email = normalizeEmail(emailRaw);
   const staff = await env.DB.prepare("SELECT id, role FROM staff_users WHERE tenant_id = ? AND email = ? AND disabled_at IS NULL")
     .bind(tenant_id, email).first<{ id: string; role: StaffRole }>();
@@ -99,7 +99,7 @@ export async function verifyStaffCode(env: Env, tenant_id: string, emailRaw: str
     tenant_id,
     jti: newId("event"),
   }, await staffKey(tenant.customer_jwt_secret));
-  return { access_token, token_type: "Bearer", expires_in: STAFF_TTL_SEC, role: staff.role };
+  return { access_token, token_type: "Bearer", expires_in: STAFF_TTL_SEC, tenant_id, role: staff.role, roles: [staff.role] };
 }
 
 /** Bearer-Token prüfen und die Zeile gegenlesen (gesperrt = draußen). */
