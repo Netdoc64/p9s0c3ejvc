@@ -41,6 +41,12 @@ jobs:
         working-directory: mobile
         run: npm run typecheck
 
+      - name: Händler-Dashboard prüfen
+        working-directory: mobile
+        run: |
+          npx --no-install tsc -p admin
+          node --test admin/test.mjs
+
       - name: Web-Build
         working-directory: mobile
         run: npm run build:web
