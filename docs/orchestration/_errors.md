@@ -258,6 +258,13 @@ diese als TypeScript-Const-Map (`src/errors/catalog.ts`, generiert aus dieser Da
 | `GH-ADMIN-002`  | 503  | manual | (intern)                              | ADMIN_API_KEY not configured on this worker; admin endpoints are off |
 | `GH-ADMIN-003`  | 409  | none   | (intern)                              | Idempotency-Key already used for an issuance; the value is not handed out again |
 
+### STAFF
+
+| code            | http | retry  | user_message                          | internal_detail                          |
+|-----------------|------|--------|---------------------------------------|------------------------------------------|
+| `GH-STAFF-001`  | 409  | none   | Diese Adresse ist bereits als Mitarbeiter eingetragen. | Duplicate staff email per tenant |
+| `GH-STAFF-002`  | 409  | none   | Du kannst dich nicht selbst sperren.  | Staff tried to disable own account |
+
 ### SECRET
 
 | code            | http | retry  | user_message                          | internal_detail                          |

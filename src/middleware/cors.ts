@@ -47,9 +47,18 @@ function isPublic(path: string): boolean {
 
 const CUSTOMER_PATH = /^\/v1\/customer\//;
 
+function inList(origin: string, list: string | undefined): boolean {
+  return Boolean(list) && (list as string).split(",").map((o) => o.trim()).filter(Boolean).includes(origin);
+}
+
 function customerOriginAllowed(path: string, origin: string, list: string | undefined): boolean {
-  if (!CUSTOMER_PATH.test(path) || !list) return false;
-  return list.split(",").map((o) => o.trim()).filter(Boolean).includes(origin);
+  return CUSTOMER_PATH.test(path) && inList(origin, list);
+}
+
+/** Händler-Dashboard: Tenant-Bereich /v1/* (ohne /v1/customer) nur für STAFF_APP_ORIGINS. */
+const TENANT_PATH = /^\/v1\//;
+function staffOriginAllowed(path: string, origin: string, list: string | undefined): boolean {
+  return TENANT_PATH.test(path) && !CUSTOMER_PATH.test(path) && inList(origin, list);
 }
 
 export const cors = (): MiddlewareHandler<AppContext> => async (c, next) => {
@@ -57,7 +66,7 @@ export const cors = (): MiddlewareHandler<AppContext> => async (c, next) => {
   const isPreflight = c.req.method === "OPTIONS";
   const path = new URL(c.req.url).pathname;
 
-  if (origin && (isPublic(path) || customerOriginAllowed(path, origin, c.env.CUSTOMER_APP_ORIGINS))) {
+  if (origin && (isPublic(path) || customerOriginAllowed(path, origin, c.env.CUSTOMER_APP_ORIGINS) || staffOriginAllowed(path, origin, c.env.STAFF_APP_ORIGINS))) {
     if (isPreflight) {
       return new Response(null, {
         status: 204,

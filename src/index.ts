@@ -2,6 +2,8 @@ import { Hono } from "hono";
 import type { AppContext, Env, OutboxMessage } from "./env";
 import { healthRoutes } from "./routes/health";
 import { adminRoutes } from "./routes/admin";
+import { staffAuthRoutes, staffRoutes } from "./routes/staff";
+import { tenantAuth } from "./middleware/tenant-auth";
 import { customersRoutes } from "./routes/customers";
 import { suppliersRoutes } from "./routes/suppliers";
 import { productsRoutes } from "./routes/products";
@@ -20,7 +22,7 @@ import { customerAuth } from "./middleware/customer-auth";
 import { clientVersionGuard } from "./middleware/client-version";
 import { customerApiRoutes } from "./routes/customer-api";
 import { productImagesRoutes } from "./routes/product-images";
-import { auth, errorHandler, idempotency, logger, requestId } from "./middleware";
+import { errorHandler, idempotency, logger, requestId } from "./middleware";
 import { securityHeaders } from "./middleware/security-headers";
 import { cors } from "./middleware/cors";
 import { queueHandler } from "./workers/queue-handler";
@@ -61,6 +63,9 @@ app.route("/admin", adminRoutes);
 // OpenAPI 3.1 Spec + Schema-Exports (öffentlich für SDK-Generierung)
 app.route("/", docsRoutes);
 
+// Mitarbeiter-Anmeldung (Händler-Dashboard), öffentlich wie die Kunden-Anmeldung
+app.route("/v1/auth/staff", staffAuthRoutes);
+
 // Customer-Auth-Endpoints (tenant-resolved via X-Tenant-Slug, kein API-Key)
 app.route("/v1/auth", authRoutes);
 
@@ -98,7 +103,8 @@ app.route("/v1/customer", customer);
 
 // Authentifizierter Bereich — alle Routes ab v1
 const v1 = new Hono<AppContext>();
-v1.use("*", auth());
+// API-Key + HMAC ODER Mitarbeiter-Token (siehe middleware/tenant-auth.ts)
+v1.use("*", tenantAuth());
 v1.use("*", idempotency());
 v1.route("/customers", customersRoutes);
 v1.route("/products", productsRoutes);
@@ -112,6 +118,7 @@ v1.route("/suppliers", supplierReturnsRoutes);
 v1.route("/invoices", invoicesRoutes);
 v1.route("/webhooks", webhooksRoutes);
 v1.route("/dsgvo", dsgvoRoutes);
+v1.route("/staff", staffRoutes);
 app.route("/v1", v1);
 
 

@@ -95,6 +95,7 @@ braucht; optional sind die Lieferanten-Anbindungen.
 |---|---|---|---|
 | `MAIL_FROM` | ja | Variable | Absenderadresse der Login-Codes (Domain aus Schritt 1) |
 | `CUSTOMER_APP_ORIGINS` | ja, sobald die Kunden-App läuft | Variable | Komma-Liste erlaubter Web-Origins für `/v1/customer/*` (CORS) |
+| `STAFF_APP_ORIGINS` | ja, sobald das Händler-Dashboard läuft | Variable | Komma-Liste erlaubter Web-Origins für den Tenant-Bereich `/v1/*` mit Mitarbeiter-Token (CORS) |
 | `FLORIDAY_CONNECTIONS` | nein | Variable | Lieferanten-Anbindung |
 | `KOMANDER_CONNECTIONS` | nein | Variable | Lieferanten-Anbindung |
 | `FLEUROP_NL_CONNECTIONS` | nein | Variable | Lieferanten-Anbindung |
@@ -128,6 +129,19 @@ Schlüsselspeicher: er ruft an, verwahrt den Wert und verteilt ihn weiter.
 
 `GET /admin/tenants` (gleicher Schlüssel) ist die Selbstauskunft für den
 Vorflug: Slug als `id`, dazu Name und Status, sonst nichts.
+
+### Mitarbeiter (Händler-Dashboard)
+
+Mitarbeiter melden sich per Mail-Code an und bekommen ein eigenes Token, das
+neben dem HMAC-Key für `/v1/*` gilt (8 Stunden, kein Refresh). Kunden-Tokens
+gelten dort nie, Mitarbeiter-Tokens nie in `/v1/customer/*`.
+
+| Schritt | Aufruf |
+|---|---|
+| ersten Inhaber anlegen | `POST /admin/tenants/<slug>/staff` mit `X-Admin-Key`, Body `{ "email": … }` |
+| Code anfordern | `POST /v1/auth/staff/code/request`, Header `X-Tenant-Slug`, Body `{ "email": … }` |
+| Code einlösen | `POST /v1/auth/staff/code/verify`, Body `{ "email", "code" }` → `access_token` |
+| Leute verwalten (nur Inhaber) | `GET/POST /v1/staff`, `DELETE /v1/staff/<id>` (sperrt sofort) |
 
 ## 4. GitHub-Environment `production`
 
