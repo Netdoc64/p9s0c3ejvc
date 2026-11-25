@@ -1,6 +1,6 @@
 // Wer darf was ändern? Eine Quelle für AGENTS.md, CLAUDE.md und die CI.
 //
-//   Frontend (Codex):  Pilot-App und Oberflächenplanung
+//   Frontend (Codex):  Pilot-App, Händler-Dashboard und Oberflächenplanung
 //   Backend (Claude):  alles andere — Worker, Daten, Tests, Betrieb, CI-Hauptdatei
 //
 // Der Vertrag zwischen beiden (OpenAPI, /v1/customer) ist Backend: Codex
@@ -8,6 +8,7 @@
 
 export const FRONTEND = [
   /^mobile\//,
+  /^admin\//,
   /^docs\/frontend-[^/]+$/,
   /^scripts\/check-frontend-plan\.mjs$/,
   /^\.github\/workflows\/mobile\.yml$/,

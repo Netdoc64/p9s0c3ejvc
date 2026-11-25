@@ -6,7 +6,7 @@ kommen, ist das Repo nach **Schicht** geteilt. Die CI prüft das bei jeder PR
 
 | Seite | Wer | Branches | Pfade |
 |---|---|---|---|
-| **Frontend** | Codex (Konto `fsvarrunner`) | `codex/…`. Jede PR des Codex-Kontos zählt als Frontend, egal wie der Branch heißt | `mobile/**`, `docs/frontend-*`, `scripts/check-frontend-plan.mjs`, `.github/workflows/mobile.yml` |
+| **Frontend** | Codex (Konto `fsvarrunner`) | `codex/…`. Jede PR des Codex-Kontos zählt als Frontend, egal wie der Branch heißt | `mobile/**`, `admin/**`, `docs/frontend-*`, `scripts/check-frontend-plan.mjs`, `.github/workflows/mobile.yml` |
 | **Backend** | Claude (Orchester und Sitzungen) | `orchester/…`, `claude/…` | alles andere: `src/**`, `migrations/**`, `tests/**`, `scripts/**`, `wrangler.toml`, `docs/**` außer `docs/frontend-*`, `.github/workflows/**` außer `mobile.yml` |
 
 Die Liste der Frontend-Pfade steht einmal in `scripts/zustaendigkeit.mjs`. Ändert
