@@ -138,7 +138,7 @@ name = "RETURNS_DO"
 class_name = "ReturnsDO"
 
 [env.production]
-vars = { ENVIRONMENT = "production", WORKER_VERSION = "0.1.0", CUSTOMER_APP_ORIGINS = "https://grosshandel-app.pages.dev" }
+vars = { ENVIRONMENT = "production", WORKER_VERSION = "0.1.0", CUSTOMER_APP_ORIGINS = "https://grosshandel-app.pages.dev", STAFF_APP_ORIGINS = "https://grosshandel-admin.pages.dev" }
 
 [[env.production.d1_databases]]
 binding = "DB"
