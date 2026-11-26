@@ -2,6 +2,7 @@ import { FloridayClient, floridayConfig } from "../../integrations/floriday";
 import { reconcilePendingPurchases } from "../../integrations/purchase-orders";
 import { syncSupplier } from "../../integrations/supplier-sync";
 import type { CronJob } from "../registry";
+import { tenantsWithModule } from "../../modules/resolve";
 
 export const supplierSyncJob: CronJob = {
   id: "supplier-sync",
@@ -9,18 +10,22 @@ export const supplierSyncJob: CronJob = {
   description: "Aktualisiert aktivierte Lieferanten-Kataloge und Angebote.",
   pause_after_failures: false,
   handler: async ({ env }) => {
-    if (!env.FLORIDAY_CONNECTIONS) return;
-    const tenants = await env.DB.prepare(`
-      SELECT tenant.id FROM tenants AS tenant
-      JOIN json_each(?) AS config ON config.key = tenant.id
-      WHERE tenant.status = 'active' AND tenant.deleted_at IS NULL
-        AND json_extract(config.value, '$.scheduled') = 1
-      ORDER BY tenant.id
-    `).bind(env.FLORIDAY_CONNECTIONS).all<{ id: string }>();
+    // Tenants mit eigenem Modul-Datensatz plus (Übergang) das alte Sammel-Secret.
+    const ids = new Set(await tenantsWithModule(env, "floriday"));
+    if (env.FLORIDAY_CONNECTIONS) {
+      const legacy = await env.DB.prepare(`
+        SELECT tenant.id FROM tenants AS tenant
+        JOIN json_each(?) AS config ON config.key = tenant.id
+        WHERE tenant.status = 'active' AND tenant.deleted_at IS NULL
+          AND json_extract(config.value, '$.scheduled') = 1
+        ORDER BY tenant.id
+      `).bind(env.FLORIDAY_CONNECTIONS).all<{ id: string }>();
+      for (const r of legacy.results ?? []) ids.add(r.id);
+    }
     // Individual failures must not prevent other tenants from progressing.
-    for (const { id } of tenants.results) {
+    for (const id of [...ids].sort()) {
       try {
-        const config = floridayConfig(env, id);
+        const config = await floridayConfig(env, id);
         if (!config?.scheduled) continue;
         const client = new FloridayClient(config);
         const connection = { tenantId: id, provider: "floriday", connection: client.connection };

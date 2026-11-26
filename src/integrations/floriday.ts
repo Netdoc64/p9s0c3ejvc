@@ -1,9 +1,10 @@
 import { z } from "zod";
 import { CodedError } from "../errors/catalog";
 import type { Env } from "../env";
+import { tenantModuleConfig } from "../modules/resolve";
 import type { RecordStream, SupplierPage, SupplierSource } from "./supplier-sync";
 
-const configSchema = z.object({
+export const floridayConfigSchema = z.object({
   environment: z.enum(["staging", "production"]),
   clientId: z.string().min(1),
   clientSecret: z.string().min(1),
@@ -13,9 +14,17 @@ const configSchema = z.object({
   scheduled: z.boolean().default(false),
   ordering: z.boolean().default(false),
 });
+const configSchema = floridayConfigSchema;
 type Config = z.infer<typeof configSchema>;
 
-export function floridayConfig(env: Env, tenantId: string): Config | undefined {
+/** Zugänge des Tenants (Modul „floriday“), übergangsweise das alte Sammel-Secret. */
+export async function floridayConfig(env: Env, tenantId: string): Promise<Config | undefined> {
+  const config = await tenantModuleConfig(env, tenantId, "floriday", configSchema, () => legacyFloridayConfig(env, tenantId));
+  if (config?.environment === "production" && env.ENVIRONMENT !== "production") throw new CodedError("GH-SUPPLIER-001", { reason: "invalid_connection_configuration" });
+  return config;
+}
+
+export function legacyFloridayConfig(env: Env, tenantId: string): Config | undefined {
   try {
     const config = env.FLORIDAY_CONNECTIONS ? JSON.parse(env.FLORIDAY_CONNECTIONS) as unknown : {};
     if (!config || typeof config !== "object" || Array.isArray(config)) throw new Error();

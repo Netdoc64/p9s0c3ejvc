@@ -11,6 +11,7 @@ import { CodedError } from "../errors/catalog";
 import { sha256Hex, constantTimeEqualHex } from "../lib/crypto";
 import { issueTenantKey } from "../services/api-key-issuance";
 import { addStaff } from "../auth/staff";
+import { moduleDef } from "../modules/registry";
 
 export const MIN_ADMIN_KEY_LENGTH = 32;
 
@@ -75,4 +76,19 @@ adminRoutes.post("/tenants/:slug/staff", async (c) => {
   const tenant = await c.env.DB.prepare("SELECT id FROM tenants WHERE slug = ? AND deleted_at IS NULL AND status = 'active'").bind(slug).first<{ id: string }>();
   if (!tenant) throw new CodedError("GH-TENANT-001");
   return c.json(await addStaff(c.env, tenant.id, body.email, role), 201);
+});
+
+/** Betreiber: Modul für einen Tenant freischalten oder sperren (`available`). */
+adminRoutes.put("/tenants/:slug/modules/:id", async (c) => {
+  const def = moduleDef(c.req.param("id"));
+  if (!def) throw new CodedError("GH-MODULE-001");
+  const body = (await c.req.json().catch(() => ({}))) as { available?: unknown };
+  if (typeof body.available !== "boolean") throw new CodedError("GH-INPUT-001", { reason: "available" });
+  const tenant = await c.env.DB.prepare("SELECT id FROM tenants WHERE slug = ? AND deleted_at IS NULL").bind(c.req.param("slug")).first<{ id: string }>();
+  if (!tenant) throw new CodedError("GH-TENANT-001");
+  const now = new Date().toISOString();
+  await c.env.DB.prepare(`INSERT INTO tenant_modules (tenant_id, module_id, available, updated_at) VALUES (?, ?, ?, ?)
+    ON CONFLICT (tenant_id, module_id) DO UPDATE SET available = excluded.available, enabled = CASE WHEN excluded.available = 0 THEN 0 ELSE enabled END, updated_at = excluded.updated_at`)
+    .bind(tenant.id, def.id, body.available ? 1 : 0, now).run();
+  return c.json({ module: def.id, available: body.available });
 });

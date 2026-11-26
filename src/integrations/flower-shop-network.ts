@@ -1,15 +1,25 @@
 import { z } from "zod";
 import type { Env } from "../env";
+import { tenantModuleConfig } from "../modules/resolve";
 import { CodedError } from "../errors/catalog";
 
-const configSchema = z.object({
+export const fsnConfigSchema = z.object({
   environment: z.enum(["development", "production"]),
   account: z.string().regex(/^[a-zA-Z0-9_-]{1,64}$/),
   token: z.string().min(1),
   ordering: z.boolean().default(false),
 });
 
-export function flowerShopNetworkConfig(env: Env, tenant: string) {
+const configSchema = fsnConfigSchema;
+
+/** Zugänge des Tenants (Modul „flower-shop-network“), übergangsweise das alte Sammel-Secret. */
+export async function flowerShopNetworkConfig(env: Env, tenant: string) {
+  const config = await tenantModuleConfig(env, tenant, "flower-shop-network", configSchema, () => legacyFlowerShopNetworkConfig(env, tenant));
+  if (config?.environment === "production" && env.ENVIRONMENT !== "production") throw new CodedError("GH-SUPPLIER-001", { reason: "invalid_connection_configuration" });
+  return config;
+}
+
+export function legacyFlowerShopNetworkConfig(env: Env, tenant: string) {
   try {
     if (!env.FSN_CONNECTIONS) return undefined;
     const connections = JSON.parse(env.FSN_CONNECTIONS) as unknown;

@@ -36,6 +36,10 @@ export interface Env {
   // Schlüssel für /admin/* (nur Business Manager). Fehlt er, sind die
   // Admin-Endpunkte aus (GH-ADMIN-002), nicht offen.
   ADMIN_API_KEY?: string;
+  // Hauptschlüssel für die Zugangsdaten der Module (64 Hex). Fehlt er, lassen
+  // sich keine Zugänge speichern (GH-MODULE-002); gelesen wird dann nur das
+  // alte Sammel-Secret.
+  MODULE_KEK?: string;
 }
 
 export interface OutboxMessage {
