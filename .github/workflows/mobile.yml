@@ -154,7 +154,14 @@ jobs:
         working-directory: mobile
         env:
           EXPO_PUBLIC_API_URL: ${{ steps.cloudflare.outputs.origin }}
-        run: npm run build:web
+          EXPO_PUBLIC_TENANT_SLUG: ${{ vars.GROSSHANDEL_TENANT_SLUG }}
+        shell: bash
+        run: |
+          if [[ -z "${EXPO_PUBLIC_TENANT_SLUG//[[:space:]]/}" ]]; then
+            echo "::error::GROSSHANDEL_TENANT_SLUG fehlt im Environment production."
+            exit 1
+          fi
+          npm run build:web
 
       - name: Web-Build nach Pages ausrollen
         env:
