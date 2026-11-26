@@ -54,6 +54,7 @@ export async function seedTenant(overrides: Partial<{ slug: string; country: str
 export async function clearTenants(): Promise<void> {
   const db = getDb(env.DB);
   await env.DB.prepare("DELETE FROM api_key_issuances").run();
+  await env.DB.prepare("DELETE FROM supplier_purchase_requests").run();
   await env.DB.prepare("DELETE FROM product_sourcing_state").run();
   await env.DB.prepare("DELETE FROM product_sources").run();
   await env.DB.prepare("DELETE FROM sourcing_rules").run();

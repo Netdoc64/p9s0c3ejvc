@@ -837,6 +837,60 @@ paths["/v1/sourcing/state"] = {
   get: { tags: ["sourcing"], security: TENANT_AUTH, summary: "Gewählte Quelle, Einkaufs- und Verkaufspreis je Artikel", operationId: "getSourcingState", responses: { 200: { description: "Stand" } } },
 };
 
+// PURCHASE ORDERS (Einkauf aus Kundenbestellungen)
+const PurchaseRequestJson = {
+  type: "object",
+  properties: {
+    id: { type: "string" }, order_id: { type: "string", pattern: "^ord_" }, line_no: { type: "integer" },
+    sku_id: { type: "string" }, sku_name: { type: ["string", "null"] },
+    provider: { type: "string" }, connection: { type: "string" }, source_ref: { type: "string" },
+    qty: { type: "integer", description: "Verkaufseinheiten der Kundenposition" },
+    source_qty: { type: "integer", description: "Einheiten beim Lieferanten (qty × Verpackungsfaktor)" },
+    cost_cents: { type: "integer", description: "Einkaufspreis je Einheit des Lieferanten" },
+    status: { type: "string", enum: ["open", "sent", "cancelled", "cancel_requested", "failed"] },
+    supplier_order_id: { type: ["string", "null"] }, supplier_status: { type: ["string", "null"] }, provider_status: { type: ["string", "null"] },
+    note: { type: ["string", "null"] }, created_at: { type: "string", format: "date-time" }, updated_at: { type: "string", format: "date-time" },
+  },
+};
+paths["/v1/purchase-orders"] = {
+  get: {
+    tags: ["purchase-orders"], security: TENANT_AUTH, summary: "Einkaufsanforderungen aus Kundenbestellungen", operationId: "listPurchaseRequests",
+    description: "Entstehen automatisch, wenn eine Kundenbestellung bestätigt wird, deren Position aus einer Lieferanten-Quelle statt aus eigenem Bestand kommt.",
+    parameters: [
+      { name: "status", in: "query", required: false, schema: { type: "string", enum: ["open", "sent", "cancelled", "cancel_requested", "failed"] } },
+      { name: "provider", in: "query", required: false, schema: { type: "string" } },
+    ],
+    responses: { 200: { description: "Liste", content: { "application/json": { schema: { type: "object", properties: { items: { type: "array", items: PurchaseRequestJson } } } } } } },
+  },
+};
+paths["/v1/purchase-orders/{id}/send"] = {
+  post: {
+    tags: ["purchase-orders"], security: TENANT_AUTH, summary: "Beim Lieferanten bestellen (nur Inhaber)", operationId: "sendPurchaseRequest",
+    description: "Floriday: legt die Einkaufsbestellung an und sendet sie (Lieferort, Termin und Zahlungsweg im Body; jede Anforderung bekommt eine feste Bestell-ID, ein zweiter Versuch erzeugt keine zweite Bestellung). Lieferanten-Dateien: markiert als übermittelt (die Bestellliste kommt aus `/export`).",
+    parameters: [{ name: "id", in: "path", required: true, schema: { type: "string" } }],
+    requestBody: { required: false, content: { "application/json": { schema: { type: "object", properties: {
+      delivery: { type: "object", required: ["latestDeliveryDateTime", "gln"], properties: { latestDeliveryDateTime: { type: "string", format: "date-time" }, gln: { type: "string", pattern: "^\\d{13}$" }, incoterm: { type: "string", default: "DAP" } } },
+      payment_provider: { type: "string", enum: ["RFH", "VRM", "PLANTION", "FX_SERVICES", "OTHER"] },
+      packing_index: { type: "integer", default: 0 }, reference: { type: "string", maxLength: 26 },
+    } } } } },
+    responses: { 200: { description: "Gesendet", content: { "application/json": { schema: PurchaseRequestJson } } }, 403: PROBLEM_RESPONSE("nur Inhaber"), 409: PROBLEM_RESPONSE("GH-SUPPLIER-003: nicht offen oder Angebot geändert"), 503: PROBLEM_RESPONSE("GH-SUPPLIER-001: Anbindung fehlt oder Bestellen nicht erlaubt") },
+  },
+};
+paths["/v1/purchase-orders/{id}/cancel"] = {
+  post: {
+    tags: ["purchase-orders"], security: TENANT_AUTH, summary: "Offene Anforderung verwerfen oder Storno beim Lieferanten bestätigen (nur Inhaber)", operationId: "cancelPurchaseRequest",
+    parameters: [{ name: "id", in: "path", required: true, schema: { type: "string" } }],
+    responses: { 200: { description: "Storniert", content: { "application/json": { schema: PurchaseRequestJson } } }, 409: PROBLEM_RESPONSE("GH-SUPPLIER-003") },
+  },
+};
+paths["/v1/purchase-orders/export"] = {
+  get: {
+    tags: ["purchase-orders"], security: TENANT_AUTH, summary: "Bestellliste für einen Datei-Lieferanten (CSV)", operationId: "exportPurchaseRequests",
+    parameters: [{ name: "connection", in: "query", required: true, schema: { type: "string" }, description: "Quellschlüssel des Lieferanten" }],
+    responses: { 200: { description: "CSV `sku;menge;positionen`", content: { "text/csv": { schema: { type: "string" } } } } },
+  },
+};
+
 // ORDERS
 paths["/v1/orders"] = {
   post: {
@@ -1582,6 +1636,7 @@ export function buildOpenApiDocument(opts: OpenApiDocOptions = {}): JsonSchema {
       { name: "staff", description: "Mitarbeiter des Händler-Dashboards" },
       { name: "modules", description: "Module je Tenant (Lieferanten-Anbindungen, Zugänge)" },
       { name: "sourcing", description: "Quellenmix: Angebote, Preisregeln, Verkaufsartikel aus Lieferanten" },
+      { name: "purchase-orders", description: "Einkauf beim Lieferanten aus Kundenbestellungen" },
       { name: "mcp", description: "Model Context Protocol für AI-Agents" },
     ],
     components: {

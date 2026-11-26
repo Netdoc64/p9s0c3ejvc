@@ -26,9 +26,15 @@ Quellen je Artikel. Die Regeln (`/v1/sourcing/rules`: günstigste, Reihenfolge
 oder schnellste Quelle, Aufschlag, Mindestmarge, Rundungsraster) bestimmen den
 Verkaufspreis. Er steht in der Standard-Preisliste mit `managed_by = 'sourcing'`
 und wird nach jedem Lieferanten-Abgleich neu gerechnet. **Ein von Hand
-gepflegter Preis wird nie überschrieben.** Kundenbestellungen auf Artikel ohne
-eigenen Bestand lösen den Einkauf beim Lieferanten noch nicht automatisch aus;
-das folgt in einem eigenen Schritt.
+gepflegter Preis wird nie überschrieben.** Reicht der eigene Bestand für eine Kundenposition nicht, die gewählte Quelle
+aber schon, kommt die Position aus dem Lieferanten statt die Bestellung
+anzuhalten. Beim Bestätigen entsteht je solcher Position eine
+Einkaufsanforderung (`GET /v1/purchase-orders`). **Gesendet wird erst durch
+einen Inhaber** (`POST /v1/purchase-orders/<id>/send`): bei Floriday als
+Einkaufsbestellung mit fester ID, bei Lieferanten-Dateien über die
+Bestellliste `GET /v1/purchase-orders/export?connection=<quelle>` (CSV). Ein
+Storno der Kundenbestellung verwirft offene Anforderungen; schon gesendete
+stehen auf `cancel_requested`, bis jemand das Storno beim Lieferanten bestätigt.
 
 ## Lieferantenangebote aus Dateien übernehmen
 

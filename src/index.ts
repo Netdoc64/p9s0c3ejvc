@@ -5,6 +5,7 @@ import { adminRoutes } from "./routes/admin";
 import { staffAuthRoutes, staffRoutes } from "./routes/staff";
 import { modulesRoutes } from "./routes/modules";
 import { sourcingRoutes } from "./routes/sourcing";
+import { purchaseRequestsRoutes } from "./routes/purchase-requests";
 import { tenantAuth } from "./middleware/tenant-auth";
 import { customersRoutes } from "./routes/customers";
 import { suppliersRoutes } from "./routes/suppliers";
@@ -123,6 +124,7 @@ v1.route("/dsgvo", dsgvoRoutes);
 v1.route("/staff", staffRoutes);
 v1.route("/modules", modulesRoutes);
 v1.route("/sourcing", sourcingRoutes);
+v1.route("/purchase-orders", purchaseRequestsRoutes);
 app.route("/v1", v1);
 
 

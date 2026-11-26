@@ -13,6 +13,7 @@ import { roundHalfToEvenInt } from "../engines/pricing";
 import { eq, and, isNull } from "drizzle-orm";
 import { orders } from "../db/schema/orders";
 import { warehouses } from "../db/schema/stock";
+import { cancelPurchaseRequests, createPurchaseRequests, lineSource, sourceForLine, type LineSource } from "../sourcing/fulfil";
 
 export interface HandlerContext {
   env: Env;
@@ -175,6 +176,8 @@ const reserveStockHandler: Handler = async (doc, { env, step, now }) => {
   // Phase 1: FEFO für ALLE Zeilen, bevor irgendetwas reserviert wird.
   const fefoByLine = new Map<number, Awaited<ReturnType<typeof fefoCheck>>>();
   const fefoBlocking: Array<{ code: string; detail: string; line_no: number }> = [];
+  // Positionen, die mangels eigenem Bestand aus einer Lieferanten-Quelle kommen (Quellenmix).
+  const supplied = new Map<number, LineSource>();
   for (const line of doc.lines) {
     const fefo = await fefoCheck(db, {
       tenant_id: doc.meta.tenant_id,
@@ -185,6 +188,8 @@ const reserveStockHandler: Handler = async (doc, { env, step, now }) => {
     });
     fefoByLine.set(line.line_no, fefo);
     if (!fefo.ok && fefo.product_is_perishable) {
+      const src = await sourceForLine(env, doc.meta.tenant_id, line.sku_id, line.qty);
+      if (src) { supplied.set(line.line_no, src); continue; }
       fefoBlocking.push({
         code: "GH-FEFO-001",
         detail: `${line.sku_id}: ${line.qty} angefordert, mit Restlaufzeit verfügbar ${fefo.total_eligible}`,
@@ -205,6 +210,11 @@ const reserveStockHandler: Handler = async (doc, { env, step, now }) => {
     const wh = whOf(line);
     const fefo = fefoByLine.get(line.line_no)!;
     fefoSummary.push({ line_no: line.line_no, perishable: fefo.product_is_perishable, eligible: fefo.total_eligible });
+    const pre = supplied.get(line.line_no);
+    if (pre) {
+      newLines.push({ ...line, warehouse_id: wh, reservation_id: null, resolution: { ...line.resolution, sourcing: pre } });
+      continue;
+    }
     let reservation;
     try {
       reservation = await stockSvc.reserve(env, {
@@ -218,6 +228,12 @@ const reserveStockHandler: Handler = async (doc, { env, step, now }) => {
       });
     } catch (err) {
       if (!(err instanceof CodedError) || err.code !== "GH-STOCK-001") throw err;
+      const src = await sourceForLine(env, doc.meta.tenant_id, line.sku_id, line.qty);
+      if (src) {
+        supplied.set(line.line_no, src);
+        newLines.push({ ...line, warehouse_id: wh, reservation_id: null, resolution: { ...line.resolution, sourcing: src } });
+        continue;
+      }
       for (const done of newLines) {
         if (!done.reservation_id) continue;
         await stockSvc.release(env, { tenant_id: doc.meta.tenant_id, warehouse_id: done.warehouse_id ?? wh, sku_id: done.sku_id, reservation_id: done.reservation_id });
@@ -235,7 +251,8 @@ const reserveStockHandler: Handler = async (doc, { env, step, now }) => {
     });
   }
   let next: OrderDoc = { ...doc, lines: newLines };
-  next = appendExecuted(next, step, now, new Date().toISOString(), "stock_reserved_fefo_checked", { lines: newLines.length, fefo: fefoSummary });
+  next = appendExecuted(next, step, now, new Date().toISOString(), supplied.size ? "stock_reserved_with_supplier_lines" : "stock_reserved_fefo_checked",
+    { lines: newLines.length, fefo: fefoSummary, supplier_lines: supplied.size });
   return { doc: next };
 };
 
@@ -250,6 +267,7 @@ const awaitConfirmationHandler: Handler = async (doc, { step, now }) => {
 
 const commitStockHandler: Handler = async (doc, { env, step, now }) => {
   for (const line of doc.lines) {
+    if (lineSource(line)) continue;
     if (!line.reservation_id) throw new CodedError("GH-STOCK-002", { line_no: line.line_no });
     const wh = line.warehouse_id ?? "wh_default";
     await stockSvc.commit(env, {
@@ -260,11 +278,12 @@ const commitStockHandler: Handler = async (doc, { env, step, now }) => {
       idempotency_key: `${doc.meta.id}:commit:${line.line_no}`,
     });
   }
+  const requests = await createPurchaseRequests(env, doc);
   let next = doc;
   if (doc.state.current === "awaiting_confirmation") {
     next = transition(next, "confirmed", step.id, now);
   }
-  next = appendExecuted(next, step, now, new Date().toISOString(), "stock_committed");
+  next = appendExecuted(next, step, now, new Date().toISOString(), "stock_committed", requests ? { purchase_requests: requests } : undefined);
   return { doc: next };
 };
 
@@ -283,6 +302,7 @@ const releaseStockHandler: Handler = async (doc, { env, step, now }) => {
       // Best-Effort: Reservation kann bereits abgelaufen sein.
     }
   }
+  await cancelPurchaseRequests(env, doc.meta.tenant_id, doc.meta.id);
   let next = doc;
   if (canTransition(doc.state.current, "cancelled")) {
     next = transition(next, "cancelled", step.id, now);
