@@ -2,7 +2,7 @@
 
 Zuständigkeiten und Regeln stehen in [AGENTS.md](AGENTS.md). Kurz:
 
-- Claude baut das **Backend**: alles außer `mobile/**`, `docs/frontend-*`,
+- Claude baut das **Backend**: alles außer `mobile/**`, `admin/**`, `docs/frontend-*`,
   `scripts/check-frontend-plan.mjs` und `.github/workflows/mobile.yml`.
 - Diese Frontend-Pfade gehören Codex. Braucht das Frontend etwas vom Backend,
   kommt es als Issue mit Label `claude`. Braucht das Backend etwas vom Frontend,
