@@ -1,5 +1,6 @@
 import { z } from "zod";
 import type { Env } from "../env";
+import { tenantModuleConfig } from "../modules/resolve";
 import { CodedError } from "../errors/catalog";
 
 const origin = "https://aestas.fleurop.nl";
@@ -8,7 +9,7 @@ const int32 = z.number().int().min(1).max(2147483647);
 export const fleuropId = z.uuid().transform((id) => id.toLowerCase());
 const dateTime = z.iso.datetime({ offset: true });
 const zip = z.string().trim().toUpperCase().regex(/^\d{4} ?[A-Z]{2}$/).transform((s) => s.replace(" ", ""));
-const configSchema = z.object({
+export const fleuropConfigSchema = z.object({
   account: z.string().regex(/^[a-zA-Z0-9_-]{1,64}$/),
   bearerToken: z.string().min(1).regex(/^[A-Za-z0-9._~-]+$/),
   sender: memberId,
@@ -16,7 +17,14 @@ const configSchema = z.object({
   ordering: z.boolean().default(false),
 });
 
-export function fleuropConfig(env: Env, tenantId: string) {
+const configSchema = fleuropConfigSchema;
+
+/** Zugänge des Tenants (Modul „fleurop-nl“), übergangsweise das alte Sammel-Secret. */
+export async function fleuropConfig(env: Env, tenantId: string) {
+  return tenantModuleConfig(env, tenantId, "fleurop-nl", configSchema, () => legacyFleuropConfig(env, tenantId));
+}
+
+export function legacyFleuropConfig(env: Env, tenantId: string) {
   try {
     if (!env.FLEUROP_NL_CONNECTIONS) return undefined;
     const config = JSON.parse(env.FLEUROP_NL_CONNECTIONS) as unknown;

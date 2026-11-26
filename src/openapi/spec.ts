@@ -696,6 +696,75 @@ paths["/v1/stock/overview"] = {
   },
 };
 
+// MODULES (Lieferanten-Anbindungen je Tenant)
+const ModuleFieldJson = {
+  type: "object", required: ["name", "label", "type", "required"],
+  properties: {
+    name: { type: "string" }, label: { type: "string" },
+    type: { type: "string", enum: ["text", "secret", "select", "boolean", "number"] },
+    required: { type: "boolean" }, options: { type: "array", items: { type: "string" } }, help: { type: "string" },
+  },
+};
+const ModuleJson = {
+  type: "object",
+  required: ["id", "name", "kind", "available", "enabled", "configured", "source", "status", "settings", "credentials", "checkable", "fields"],
+  properties: {
+    id: { type: "string" }, name: { type: "string" }, kind: { type: "string", enum: ["supplier", "network", "shop"] }, description: { type: "string" },
+    available: { type: "boolean", description: "Vom Betreiber freigeschaltet" },
+    enabled: { type: "boolean" }, configured: { type: "boolean" },
+    source: { type: "string", enum: ["tenant", "legacy"], description: "legacy = noch aus dem alten Sammel-Secret des Betreibers" },
+    status: { type: "string", enum: ["ok", "error", "unchecked"] },
+    last_checked_at: { type: ["string", "null"], format: "date-time" }, last_error: { type: ["string", "null"] },
+    settings: { type: "object", additionalProperties: true, description: "Nur nicht geheime Felder" },
+    credentials: { type: "object", properties: { configured: { type: "boolean" }, fingerprint: { type: "string" }, updated_at: { type: "string", format: "date-time" } } },
+    checkable: { type: "boolean" },
+    fields: { type: "array", items: ModuleFieldJson },
+  },
+};
+const MODULE_ID = { name: "id", in: "path" as const, required: true, schema: { type: "string", enum: ["floriday", "fleurop-nl", "flower-shop-network", "komander", "file-import"] } };
+
+paths["/v1/modules"] = {
+  get: {
+    tags: ["modules"], security: TENANT_AUTH, summary: "Module des Tenants", operationId: "listModules",
+    responses: { 200: { description: "Liste", content: { "application/json": { schema: { type: "object", properties: { data: { type: "array", items: ModuleJson } } } } } } },
+  },
+};
+paths["/v1/modules/{id}"] = {
+  get: {
+    tags: ["modules"], security: TENANT_AUTH, summary: "Ein Modul", operationId: "getModule", parameters: [MODULE_ID],
+    responses: { 200: { description: "Modul", content: { "application/json": { schema: ModuleJson } } }, 404: PROBLEM_RESPONSE("GH-MODULE-001") },
+  },
+  put: {
+    tags: ["modules"], security: TENANT_AUTH, summary: "Ein-/ausschalten und offene Einstellungen setzen (nur Inhaber)",
+    description: "Einschalten gelingt nur, wenn alle Pflichtfelder (offen und geheim) vorhanden und gültig sind. Geheime Felder in `settings` werden abgewiesen.",
+    operationId: "updateModule", parameters: [MODULE_ID],
+    requestBody: { required: true, content: { "application/json": { schema: { type: "object", properties: { enabled: { type: "boolean" }, settings: { type: "object", additionalProperties: true } } } } } },
+    responses: { 200: { description: "Modul", content: { "application/json": { schema: ModuleJson } } }, 403: PROBLEM_RESPONSE("nur Inhaber"), 404: PROBLEM_RESPONSE("GH-MODULE-001"), 422: PROBLEM_RESPONSE("GH-MODULE-004: unvollständig, mit `fields`") },
+  },
+};
+paths["/v1/modules/{id}/credentials"] = {
+  put: {
+    tags: ["modules"], security: TENANT_AUTH, summary: "Geheime Felder setzen oder ersetzen (nur Inhaber)",
+    description: "Nicht genannte geheime Felder bleiben erhalten. Die Antwort enthält nie einen Wert.",
+    operationId: "putModuleCredentials", parameters: [MODULE_ID],
+    requestBody: { required: true, content: { "application/json": { schema: { type: "object", additionalProperties: { type: "string" } } } } },
+    responses: {
+      200: { description: "Gespeichert", content: { "application/json": { schema: { type: "object", properties: { configured: { type: "boolean" }, fingerprint: { type: "string" }, updated_at: { type: "string", format: "date-time" } } } } } },
+      403: PROBLEM_RESPONSE("nur Inhaber"), 422: PROBLEM_RESPONSE("GH-MODULE-004"), 503: PROBLEM_RESPONSE("GH-MODULE-002: Hauptschlüssel fehlt am Worker"),
+    },
+  },
+  delete: {
+    tags: ["modules"], security: TENANT_AUTH, summary: "Zugang entfernen (Modul geht aus, nur Inhaber)", operationId: "deleteModuleCredentials", parameters: [MODULE_ID],
+    responses: { 204: { description: "Entfernt" }, 403: PROBLEM_RESPONSE("nur Inhaber") },
+  },
+};
+paths["/v1/modules/{id}/check"] = {
+  post: {
+    tags: ["modules"], security: TENANT_AUTH, summary: "Verbindung jetzt prüfen (nur Inhaber)", operationId: "checkModule", parameters: [MODULE_ID],
+    responses: { 200: { description: "Ergebnis", content: { "application/json": { schema: { type: "object", properties: { status: { type: "string", enum: ["ok", "error", "unchecked"] }, detail: { type: ["string", "null"] }, checked_at: { type: "string", format: "date-time" } } } } } }, 404: PROBLEM_RESPONSE("GH-MODULE-001") },
+  },
+};
+
 // ORDERS
 paths["/v1/orders"] = {
   post: {
@@ -1439,6 +1508,7 @@ export function buildOpenApiDocument(opts: OpenApiDocOptions = {}): JsonSchema {
       { name: "webhooks", description: "Webhook-Subscriptions für Tenant-ERP-Integration" },
       { name: "customer-self", description: "Endkunden-Self-Service (JWT-authenticated)" },
       { name: "staff", description: "Mitarbeiter des Händler-Dashboards" },
+      { name: "modules", description: "Module je Tenant (Lieferanten-Anbindungen, Zugänge)" },
       { name: "mcp", description: "Model Context Protocol für AI-Agents" },
     ],
     components: {

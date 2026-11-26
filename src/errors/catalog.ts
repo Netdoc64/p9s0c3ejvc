@@ -137,6 +137,12 @@ export const ERROR_CATALOG = {
   "GH-STAFF-001": { code: "GH-STAFF-001", http_status: 409, category: "client_error", retry: "none", user_message: "Diese Adresse ist bereits als Mitarbeiter eingetragen.", internal_detail: "Duplicate staff email per tenant", status: "active" },
   "GH-STAFF-002": { code: "GH-STAFF-002", http_status: 409, category: "client_error", retry: "none", user_message: "Du kannst dich nicht selbst sperren.", internal_detail: "Staff tried to disable own account", status: "active" },
 
+  // MODULE — Module je Tenant (Lieferanten-Anbindungen)
+  "GH-MODULE-001": { code: "GH-MODULE-001", http_status: 404, category: "client_error", retry: "none", user_message: "Dieses Modul gibt es nicht oder es ist für deinen Betrieb nicht freigeschaltet.", internal_detail: "Unknown module or not available for tenant", status: "active" },
+  "GH-MODULE-002": { code: "GH-MODULE-002", http_status: 503, category: "server_error", retry: "manual", user_message: "Zugangsdaten können gerade nicht gespeichert werden.", internal_detail: "MODULE_KEK missing or malformed on this worker", status: "active" },
+  "GH-MODULE-003": { code: "GH-MODULE-003", http_status: 500, category: "server_error", retry: "manual", user_message: "Gespeicherte Zugangsdaten sind nicht lesbar; bitte neu eingeben.", internal_detail: "Module credentials could not be decrypted (wrong key or tampered record)", status: "active" },
+  "GH-MODULE-004": { code: "GH-MODULE-004", http_status: 422, category: "client_error", retry: "none", user_message: "Die Angaben für dieses Modul sind unvollständig oder ungültig.", internal_detail: "Module settings/credentials failed schema validation", status: "active" },
+
   // SECRET
   "GH-SECRET-001": { code: "GH-SECRET-001", http_status: 409, category: "server_error", retry: "none", user_message: "(intern)", internal_detail: "Secret rotation conflict or generation failure", status: "active" },
 

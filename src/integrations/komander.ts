@@ -1,10 +1,17 @@
 import { z } from "zod";
 import type { Env } from "../env";
+import { tenantModuleConfig } from "../modules/resolve";
 import { CodedError } from "../errors/catalog";
 
-const tenantConfig = z.object({ storeKey: z.string().min(1), checkout: z.boolean().default(false) });
+export const komanderConfigSchema = z.object({ storeKey: z.string().min(1), checkout: z.boolean().default(false) });
+const tenantConfig = komanderConfigSchema;
 
-export function komanderConfig(env: Env, tenantId: string) {
+/** Zugänge des Tenants (Modul „komander“), übergangsweise das alte Sammel-Secret. */
+export async function komanderConfig(env: Env, tenantId: string) {
+  return tenantModuleConfig(env, tenantId, "komander", tenantConfig, () => legacyKomanderConfig(env, tenantId));
+}
+
+export function legacyKomanderConfig(env: Env, tenantId: string) {
   try {
     if (!env.KOMANDER_CONNECTIONS) return undefined;
     const config = JSON.parse(env.KOMANDER_CONNECTIONS) as unknown;

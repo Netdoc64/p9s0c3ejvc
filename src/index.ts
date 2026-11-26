@@ -3,6 +3,7 @@ import type { AppContext, Env, OutboxMessage } from "./env";
 import { healthRoutes } from "./routes/health";
 import { adminRoutes } from "./routes/admin";
 import { staffAuthRoutes, staffRoutes } from "./routes/staff";
+import { modulesRoutes } from "./routes/modules";
 import { tenantAuth } from "./middleware/tenant-auth";
 import { customersRoutes } from "./routes/customers";
 import { suppliersRoutes } from "./routes/suppliers";
@@ -119,6 +120,7 @@ v1.route("/invoices", invoicesRoutes);
 v1.route("/webhooks", webhooksRoutes);
 v1.route("/dsgvo", dsgvoRoutes);
 v1.route("/staff", staffRoutes);
+v1.route("/modules", modulesRoutes);
 app.route("/v1", v1);
 
 

@@ -1,5 +1,18 @@
 # Lieferanten-Anbindungen
 
+## Module je Tenant (empfohlen)
+
+Jeder Tenant schaltet seine Anbindungen selbst ein und pflegt die Zugänge im
+Händler-Dashboard bzw. über `/v1/modules` (nur Inhaber). Geheime Felder werden
+mit dem Worker-Secret `MODULE_KEK` verschlüsselt gespeichert und nie wieder
+herausgegeben; die Antwort nennt nur einen Abdruck. Was ein Tenant überhaupt
+nutzen darf, legt der Betreiber mit `PUT /admin/tenants/<slug>/modules/<id>`
+(`{"available": false}`) fest.
+
+Die unten beschriebenen Sammel-Secrets (`*_CONNECTIONS`) gelten nur noch
+übergangsweise für Tenants **ohne** eigenen Modul-Datensatz. Sobald ein Tenant
+ein Modul selbst einrichtet oder ausschaltet, gilt sein Datensatz.
+
 Die Anbindungen sind pro Mandant konfiguriert. Die API verwendet dieselbe
 Tenant-HMAC-Signatur wie die übrigen Routen unter `/v1`. Die Routen und
 Request-Schemas stehen im laufenden Worker unter `/openapi.json`.

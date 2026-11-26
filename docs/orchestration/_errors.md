@@ -265,6 +265,15 @@ diese als TypeScript-Const-Map (`src/errors/catalog.ts`, generiert aus dieser Da
 | `GH-STAFF-001`  | 409  | none   | Diese Adresse ist bereits als Mitarbeiter eingetragen. | Duplicate staff email per tenant |
 | `GH-STAFF-002`  | 409  | none   | Du kannst dich nicht selbst sperren.  | Staff tried to disable own account |
 
+### MODULE
+
+| code            | http | retry  | user_message                          | internal_detail                          |
+|-----------------|------|--------|---------------------------------------|------------------------------------------|
+| `GH-MODULE-001` | 404  | none   | Dieses Modul gibt es nicht oder es ist für deinen Betrieb nicht freigeschaltet. | Unknown module or not available for tenant |
+| `GH-MODULE-002` | 503  | manual | Zugangsdaten können gerade nicht gespeichert werden. | MODULE_KEK missing or malformed on this worker |
+| `GH-MODULE-003` | 500  | manual | Gespeicherte Zugangsdaten sind nicht lesbar; bitte neu eingeben. | Module credentials could not be decrypted |
+| `GH-MODULE-004` | 422  | none   | Die Angaben für dieses Modul sind unvollständig oder ungültig. | Module settings/credentials failed schema validation |
+
 ### SECRET
 
 | code            | http | retry  | user_message                          | internal_detail                          |
