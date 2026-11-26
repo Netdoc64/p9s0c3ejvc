@@ -17,6 +17,19 @@ Die Anbindungen sind pro Mandant konfiguriert. Die API verwendet dieselbe
 Tenant-HMAC-Signatur wie die übrigen Routen unter `/v1`. Die Routen und
 Request-Schemas stehen im laufenden Worker unter `/openapi.json`.
 
+## Quellenmix: Verkaufsartikel aus Lieferanten
+
+`/v1/sourcing/offers` zeigt die Angebote aller aktiven Quellen in einer Form.
+`POST /v1/sourcing/import` übernimmt ausgewählte Angebote als Verkaufsartikel
+und verknüpft sie; `PUT /v1/sourcing/products/<id>/sources` setzt mehrere
+Quellen je Artikel. Die Regeln (`/v1/sourcing/rules`: günstigste, Reihenfolge
+oder schnellste Quelle, Aufschlag, Mindestmarge, Rundungsraster) bestimmen den
+Verkaufspreis. Er steht in der Standard-Preisliste mit `managed_by = 'sourcing'`
+und wird nach jedem Lieferanten-Abgleich neu gerechnet. **Ein von Hand
+gepflegter Preis wird nie überschrieben.** Kundenbestellungen auf Artikel ohne
+eigenen Bestand lösen den Einkauf beim Lieferanten noch nicht automatisch aus;
+das folgt in einem eigenen Schritt.
+
 ## Lieferantenangebote aus Dateien übernehmen
 
 Für freigegebene Lieferantenexporte ohne direkte API kann pro Mandant und

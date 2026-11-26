@@ -765,6 +765,78 @@ paths["/v1/modules/{id}/check"] = {
   },
 };
 
+// SOURCING (Quellenmix)
+const OfferJson = {
+  type: "object",
+  properties: {
+    provider: { type: "string", example: "file-import" }, connection: { type: "string" }, source_ref: { type: "string" },
+    sku: { type: "string" }, name: { type: "string" }, unit: { type: "string" },
+    cost_cents: { type: "integer", description: "Einkaufspreis je Einheit der Quelle, auf ganze Cent aufgerundet" },
+    currency: { type: "string" }, available_quantity: { type: "integer" }, minimum_quantity: { type: "integer" },
+    delivery_from: { type: ["string", "null"], format: "date-time" }, expires_at: { type: ["string", "null"], format: "date-time" },
+  },
+};
+const RulesJson = {
+  type: "object", required: ["strategy", "markup_pct"],
+  properties: {
+    strategy: { type: "string", enum: ["cheapest", "priority", "fastest"] },
+    priority: { type: "array", items: { type: "string" }, description: "Reihenfolge der Quellen als `provider` oder `provider:connection`" },
+    markup_pct: { type: "number", minimum: 0, maximum: 1000 },
+    min_margin_cents: { type: "integer", minimum: 0 },
+    round_to_cents: { type: "integer", minimum: 1, description: "Verkaufspreis wird auf dieses Raster AUFgerundet" },
+  },
+};
+const SourceRefJson = { type: "object", required: ["provider", "connection", "source_ref"], properties: { provider: { type: "string" }, connection: { type: "string" }, source_ref: { type: "string" }, pack_factor: { type: "integer", minimum: 1, default: 1 } } };
+const RecomputeJson = { type: "object", properties: { products: { type: "integer" }, priced: { type: "integer" }, without_source: { type: "integer" }, kept_manual: { type: "integer", description: "Artikel mit von Hand gepflegtem Preis (wird nie überschrieben)" } } };
+
+paths["/v1/sourcing/offers"] = {
+  get: {
+    tags: ["sourcing"], security: TENANT_AUTH, summary: "Angebote aller aktiven Quellen, gemischt", operationId: "listSourcingOffers",
+    description: "Ohne Abgelaufenes, Ausverkauftes, fremde Währungen und ausgeschaltete Module.",
+    parameters: [
+      { name: "q", in: "query", required: false, schema: { type: "string" } },
+      { name: "source", in: "query", required: false, schema: { type: "string" }, description: "`provider` oder `provider:connection`" },
+      { name: "after", in: "query", required: false, schema: { type: "string" } },
+      { name: "limit", in: "query", required: false, schema: { type: "integer", minimum: 1, maximum: 200, default: 50 } },
+    ],
+    responses: { 200: { description: "Seite", content: { "application/json": { schema: { type: "object", properties: { items: { type: "array", items: OfferJson }, next_after: { type: ["string", "null"] }, total: { type: "integer" } } } } } } },
+  },
+};
+paths["/v1/sourcing/rules"] = {
+  get: { tags: ["sourcing"], security: TENANT_AUTH, summary: "Preisregeln", operationId: "getSourcingRules", responses: { 200: { description: "Regeln", content: { "application/json": { schema: RulesJson } } } } },
+  put: {
+    tags: ["sourcing"], security: TENANT_AUTH, summary: "Preisregeln setzen (nur Inhaber), rechnet sofort neu", operationId: "putSourcingRules",
+    requestBody: { required: true, content: { "application/json": { schema: RulesJson } } },
+    responses: { 200: { description: "Gesetzt", content: { "application/json": { schema: { type: "object", properties: { rules: RulesJson, recompute: RecomputeJson } } } } }, 403: PROBLEM_RESPONSE("nur Inhaber") },
+  },
+};
+paths["/v1/sourcing/products/{id}/sources"] = {
+  get: {
+    tags: ["sourcing"], security: TENANT_AUTH, summary: "Quellen und gewählte Quelle eines Artikels", operationId: "getProductSources",
+    parameters: [{ name: "id", in: "path", required: true, schema: { type: "string", pattern: "^sku_" } }],
+    responses: { 200: { description: "Quellen", content: { "application/json": { schema: { type: "object", properties: { sources: { type: "array", items: SourceRefJson }, state: { type: ["object", "null"] } } } } } }, 404: PROBLEM_RESPONSE("GH-PROD-001") },
+  },
+  put: {
+    tags: ["sourcing"], security: TENANT_AUTH, summary: "Quellen eines Artikels ersetzen (nur Inhaber)", operationId: "putProductSources",
+    parameters: [{ name: "id", in: "path", required: true, schema: { type: "string", pattern: "^sku_" } }],
+    requestBody: { required: true, content: { "application/json": { schema: { type: "array", items: SourceRefJson, maxItems: 20 } } } },
+    responses: { 200: { description: "Gesetzt" }, 403: PROBLEM_RESPONSE("nur Inhaber"), 404: PROBLEM_RESPONSE("GH-PROD-001") },
+  },
+};
+paths["/v1/sourcing/import"] = {
+  post: {
+    tags: ["sourcing"], security: TENANT_AUTH, summary: "Angebote als Verkaufsartikel übernehmen (nur Inhaber)", operationId: "importSourcingOffers",
+    requestBody: { required: true, content: { "application/json": { schema: { type: "object", required: ["items"], properties: { items: { type: "array", maxItems: 200, items: { type: "object", required: ["provider", "connection", "source_ref"], properties: { provider: { type: "string" }, connection: { type: "string" }, source_ref: { type: "string" } } } }, tax_class: { type: "string", enum: ["standard", "reduced", "zero"], default: "reduced" } } } } } },
+    responses: { 201: { description: "Übernommen", content: { "application/json": { schema: { type: "object", properties: { created: { type: "array", items: { type: "string" } }, linked: { type: "array", items: { type: "string" } }, missing: { type: "array", items: { type: "string" } }, recompute: RecomputeJson } } } } }, 403: PROBLEM_RESPONSE("nur Inhaber") },
+  },
+};
+paths["/v1/sourcing/recompute"] = {
+  post: { tags: ["sourcing"], security: TENANT_AUTH, summary: "Preise jetzt neu rechnen (nur Inhaber)", operationId: "recomputeSourcing", responses: { 200: { description: "Ergebnis", content: { "application/json": { schema: RecomputeJson } } } } },
+};
+paths["/v1/sourcing/state"] = {
+  get: { tags: ["sourcing"], security: TENANT_AUTH, summary: "Gewählte Quelle, Einkaufs- und Verkaufspreis je Artikel", operationId: "getSourcingState", responses: { 200: { description: "Stand" } } },
+};
+
 // ORDERS
 paths["/v1/orders"] = {
   post: {
@@ -1509,6 +1581,7 @@ export function buildOpenApiDocument(opts: OpenApiDocOptions = {}): JsonSchema {
       { name: "customer-self", description: "Endkunden-Self-Service (JWT-authenticated)" },
       { name: "staff", description: "Mitarbeiter des Händler-Dashboards" },
       { name: "modules", description: "Module je Tenant (Lieferanten-Anbindungen, Zugänge)" },
+      { name: "sourcing", description: "Quellenmix: Angebote, Preisregeln, Verkaufsartikel aus Lieferanten" },
       { name: "mcp", description: "Model Context Protocol für AI-Agents" },
     ],
     components: {
