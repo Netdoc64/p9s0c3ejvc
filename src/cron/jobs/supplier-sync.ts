@@ -3,6 +3,7 @@ import { reconcilePendingPurchases } from "../../integrations/purchase-orders";
 import { syncSupplier } from "../../integrations/supplier-sync";
 import type { CronJob } from "../registry";
 import { tenantsWithModule } from "../../modules/resolve";
+import { recompute, tenantsWithSources } from "../../sourcing/engine";
 
 export const supplierSyncJob: CronJob = {
   id: "supplier-sync",
@@ -37,6 +38,14 @@ export const supplierSyncJob: CronJob = {
         await reconcilePendingPurchases(env.DB, connection, client);
       } catch {
         console.error(JSON.stringify({ event: "supplier.connection_failed", provider: "floriday", tenant_id: id }));
+      }
+    }
+    // Nach dem Abgleich die Verkaufspreise aus den Quellen neu rechnen.
+    for (const id of await tenantsWithSources(env)) {
+      try {
+        await recompute(env, id);
+      } catch {
+        console.error(JSON.stringify({ event: "sourcing.recompute_failed", tenant_id: id }));
       }
     }
   },

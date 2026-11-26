@@ -4,6 +4,7 @@ import { healthRoutes } from "./routes/health";
 import { adminRoutes } from "./routes/admin";
 import { staffAuthRoutes, staffRoutes } from "./routes/staff";
 import { modulesRoutes } from "./routes/modules";
+import { sourcingRoutes } from "./routes/sourcing";
 import { tenantAuth } from "./middleware/tenant-auth";
 import { customersRoutes } from "./routes/customers";
 import { suppliersRoutes } from "./routes/suppliers";
@@ -121,6 +122,7 @@ v1.route("/webhooks", webhooksRoutes);
 v1.route("/dsgvo", dsgvoRoutes);
 v1.route("/staff", staffRoutes);
 v1.route("/modules", modulesRoutes);
+v1.route("/sourcing", sourcingRoutes);
 app.route("/v1", v1);
 
 
