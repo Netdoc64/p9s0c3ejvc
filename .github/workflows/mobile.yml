@@ -31,6 +31,9 @@ jobs:
           cache: npm
           cache-dependency-path: mobile/package-lock.json
 
+      - name: Fehlermeldungen der Kunden-App prüfen
+        run: node --test mobile/tests/request-failure.test.mjs
+
       - name: Frontend-Plan prüfen
         run: node scripts/check-frontend-plan.mjs
 

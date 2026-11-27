@@ -2,6 +2,7 @@ import * as Crypto from "expo-crypto";
 import * as SecureStore from "expo-secure-store";
 import { Platform } from "react-native";
 import { pilotConfiguration } from "./config";
+import { describeRequestFailure } from "./request-failure";
 import { RequestFailure, type LineInput, type OperationResult, type Order, type OrderResult, type OrderSummary, type PilotApi, type Product, type Quote, type Session } from "./contracts";
 
 interface Tokens { access_token: string; refresh_token: string }
@@ -90,27 +91,12 @@ export function remoteApi(baseUrl: string, tenant: string): PilotApi {
         body: options.body ? JSON.stringify(options.body) : undefined,
       });
     } catch {
-      throw new RequestFailure("Keine Verbindung zum Bestellservice.", "NETWORK");
+      const failure = await describeRequestFailure();
+      throw new RequestFailure(failure.message, failure.code);
     }
     if (!response.ok) {
-      const problem = await response.json().catch(() => ({})) as { code?: string };
-      const wait = Number(response.headers.get("Retry-After"));
-      const code = response.status === 429 ? "RATE" : problem.code ?? `HTTP-${response.status}`;
-      const messages: Record<string, string> = {
-        "GH-AUTH-002": "Bitte melde dich erneut an.",
-        "GH-AUTH-005": "Bitte melde dich erneut an.",
-        "GH-AUTH-006": "Der Code wurde nicht akzeptiert. Prüfe ihn oder fordere einen neuen an.",
-        "GH-AUTH-007": "Bitte melde dich erneut an.",
-        "GH-EXT-003": "Anmeldung per E-Mail ist gerade nicht verfügbar.",
-        "GH-CLIENT-001": "Du brauchst eine neuere Version der App.",
-        "GH-ORDER-001": "Bestellung nicht verfügbar.",
-        "GH-PROD-001": "Ein Artikel ist nicht mehr verfügbar. Prüfe deinen Warenkorb.",
-        "GH-PROD-003": "Eine Position unterschreitet die Mindestmenge.",
-        "GH-PRICE-001": "Für diese Position liegt kein aktueller Preis vor.",
-        "GH-INPUT-001": "Prüfe die ausgewählten Mengen und Artikel.",
-        RATE: "Zu viele Anfragen. Bitte warte und versuche es erneut.",
-      };
-      throw new RequestFailure(messages[code] ?? "Der Bestellservice konnte die Anfrage nicht abschließen.", code, wait || undefined);
+      const failure = await describeRequestFailure(response);
+      throw new RequestFailure(failure.message, failure.code, failure.retryAfter);
     }
     if (response.status === 204) return undefined;
     return options.pdf ? response.blob() : response.json();
