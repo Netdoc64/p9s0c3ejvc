@@ -6,7 +6,7 @@ import {
 } from "./contracts";
 
 const catalog: Product[] = [
-  { id: "sku_rose_red", sku_code: "RO-RED-60", name: "Rose Red Naomi", variant: "Rot · 60 cm", sale_unit: "Karton", contains: 50, unit_of_inner: "Stiele", min_order_qty: 1 },
+  { id: "sku_rose_red", available_quantity: 24, sku_code: "RO-RED-60", name: "Rose Red Naomi", variant: "Rot · 60 cm", sale_unit: "Karton", contains: 50, unit_of_inner: "Stiele", min_order_qty: 1 },
   { id: "sku_rose_white", sku_code: "RO-WHI-60", name: "Rose Avalanche", variant: "Weiß · 60 cm", sale_unit: "Karton", contains: 50, unit_of_inner: "Stiele", min_order_qty: 1 },
   { id: "sku_tulip", sku_code: "TU-PNK-40", name: "Tulpe Pink Impression", variant: "Rosa · 40 cm", sale_unit: "Karton", contains: 50, unit_of_inner: "Stiele", min_order_qty: 2 },
   { id: "sku_gerbera", sku_code: "GE-ORA-45", name: "Gerbera Terra", variant: "Orange · 45 cm", sale_unit: "Karton", contains: 30, unit_of_inner: "Stiele", min_order_qty: 1 },

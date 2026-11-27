@@ -12,6 +12,7 @@ async function signIn(page, account) {
 async function putInCart(page) {
   await page.getByRole("textbox", {name:"Name oder Artikelnummer"}).fill("RO-RED");
   await page.getByRole("button", {name:/Rose Red Naomi/}).click();
+  await page.getByText("Verfügbar: 24 · Einheit: Karton", {exact:true}).waitFor();
   await page.getByRole("textbox", {name:"Menge in Karton"}).fill("10");
   await page.getByRole("button", {name:"In den Warenkorb"}).click();
   await page.getByRole("button", {name:"Warenkorb ansehen"}).click();

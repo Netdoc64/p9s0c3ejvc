@@ -30,3 +30,20 @@ button:disabled { opacity: .65; cursor: default }
 .form button { margin-inline-end: .5rem }
 .form [hidden] { display: none }
 :focus-visible { outline: 3px solid #a35b1d; outline-offset: 2px }
+
+.sourcing-content { display: grid; gap: 1rem }
+.sourcing-content h2 { margin-block: .2rem .6rem; font: 1.45rem Georgia,serif }
+.sourcing-card, .rules-form fieldset { padding: 1rem; background: white; border: 1px solid #cbd8cd; border-radius: .5rem }
+.sourcing-card details { margin-block: .75rem }
+.sourcing-card summary { cursor: pointer; width: fit-content }
+.sourcing-card .form { margin-top: .75rem }
+.sourcing-card .form input[type=checkbox] { width: auto }
+.sourcing-card small { display: block }
+.sourcing-card > button { margin-inline-end: .5rem }
+.sourcing-filters { display: flex; flex-wrap: wrap; gap: .75rem }
+.sourcing-filters input, .sourcing-filters select { display: block; padding: .4rem; max-width: 100% }
+.sourcing-content button { justify-self: start }
+.rules-form fieldset { margin: 0 0 .75rem; min-width: 0 }
+.rules-form li { margin-bottom: .5rem }
+.rules-form li button { margin-inline: .35rem 0 }
+.rules-form [draggable=true] { cursor: grab }
