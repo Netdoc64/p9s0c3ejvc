@@ -3,6 +3,8 @@ import { loadDashboard } from "./data.mjs";
 import { activeToken, ApiError, endSession, getProfile, live } from "./api.mjs";
 import { errorMessage, showLogin } from "./login.mjs";
 import { renderTeam } from "./team.mjs";
+import { renderModules } from "./modules.mjs";
+import { renderOffers, renderPurchases, renderRules } from "./sourcing.mjs";
 const money = (/** @type {number} */ cents, /** @type {string} */ currency) =>
   new Intl.NumberFormat("de-DE", { style: "currency", currency }).format(cents / 100);
 /** @param {Awaited<ReturnType<typeof loadDashboard>>} data */
@@ -45,10 +47,18 @@ let sections = [];
 let profile = null;
 let ready = false;
 const team = { id: "team", title: "Team" };
+const sourcing = [
+  { id: "module", title: "Module", render: renderModules },
+  { id: "angebote", title: "Angebote", render: renderOffers },
+  { id: "preisregeln", title: "Preisregeln", render: renderRules },
+  { id: "einkauf", title: "Einkauf", render: (/** @type {HTMLElement} */ main, /** @type {boolean} */ _owner, /** @type {() => void} */ onExpired) =>
+    renderPurchases(main, onExpired) },
+];
+const onExpired = () => renderLogin("Die Sitzung ist abgelaufen. Bitte erneut anmelden.");
 function renderNav() {
   if (!nav) return;
   nav.replaceChildren();
-  for (const section of [overview, ...sections, ...(profile?.role === "owner" ? [team] : [])]) {
+  for (const section of [overview, ...sections, ...(profile ? sourcing : []), ...(profile?.role === "owner" ? [team] : [])]) {
     const link = document.createElement("a");
     link.href = "#" + section.id;
     link.textContent = section.title;
@@ -59,7 +69,8 @@ function render() {
   if (!main || !nav || !ready) return;
   const section = sections.find(s => s.id === location.hash.slice(1));
   const teamProfile = location.hash === "#team" && profile?.role === "owner" ? profile : null;
-  const current = teamProfile ? team : section ?? overview;
+  const sourcingSection = profile ? sourcing.find(item => item.id === location.hash.slice(1)) : undefined;
+  const current = teamProfile ? team : sourcingSection ?? section ?? overview;
   document.title = current.title + " · Händler-Dashboard";
   for (const link of nav.querySelectorAll("a")) {
     if (link.hash === "#" + current.id) link.setAttribute("aria-current", "page");
@@ -67,7 +78,11 @@ function render() {
   }
   main.replaceChildren(element("h1", current.title));
   if (teamProfile) {
-    renderTeam(main, teamProfile, () => renderLogin("Die Sitzung ist abgelaufen. Bitte erneut anmelden."));
+    renderTeam(main, teamProfile, onExpired);
+    return;
+  }
+  if (sourcingSection) {
+    sourcingSection.render(main, profile?.role === "owner", onExpired);
     return;
   }
   if (!section) {

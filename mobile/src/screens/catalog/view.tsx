@@ -15,6 +15,13 @@ function ProductImage({ item, large = false }: { item: Product; large?: boolean 
 }
 
 
+function Availability({ item }: { item: Product }) {
+  if (item.available_quantity === undefined) return null;
+  return <Text style={styles.muted}>
+    {item.available_quantity === 0 ? "Derzeit nicht verfügbar" : `Verfügbar: ${item.available_quantity} · Einheit: ${item.sale_unit}`}
+  </Text>;
+}
+
 type CatalogProps = {
   query: string; loadedQuery?: string; items: Product[]; loading: boolean; error: string;
   setQuery: (value: string) => void; refresh: () => void; enterProduct: (item: Product) => void;
@@ -29,7 +36,7 @@ export function CatalogScreen({ query, loadedQuery, items, loading, error, setQu
     {loadedQuery === query && items.map((item) => <Pressable accessibilityRole="button" accessibilityLabel={`${item.name}, ${item.variant}`} key={item.id} onPress={() => enterProduct(item)} style={layout.product}>
       <ProductImage key={item.image_url ?? item.id} item={item} />
       <View style={layout.productText}><Text style={styles.heading}>{item.name}</Text>
-        <Text style={styles.muted}>{item.variant} · {item.contains} {item.unit_of_inner} je {item.sale_unit}</Text></View>
+        <Text style={styles.muted}>{item.variant} · {item.contains} {item.unit_of_inner} je {item.sale_unit}</Text><Availability item={item} /></View>
     </Pressable>)}
   </>;
 }
@@ -46,6 +53,7 @@ export function ProductScreen({ selected, qty, activeQuote, cartLocked, error, i
     <Card><ProductImage key={selected.image_url ?? selected.id} item={selected} large /><Text style={styles.heading}>{selected.name}</Text>
       <Text style={styles.body}>{selected.variant} · {selected.sku_code}</Text>
       <Text style={styles.muted}>{selected.contains} {selected.unit_of_inner} je {selected.sale_unit} · Mindestmenge {selected.min_order_qty}</Text>
+      <Availability item={selected} />
     </Card>
     <Quantity label={`Menge in ${selected.sale_unit}`} qty={qty} min={selected.min_order_qty} change={setQty} invalid={setQuantityInvalid} disabled={cartLocked} />
     <Text style={styles.heading}>{activeQuote ? `${euro(activeQuote.lines[0].unit_price_cents)} netto je ${selected.sale_unit}` : "Preis wird geprüft"}</Text>

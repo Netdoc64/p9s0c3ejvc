@@ -16,6 +16,7 @@ interface WireProduct {
   description: string | null;
   min_order_qty: number;
   image_url?: string | null;
+  available_quantity?: number | null;
   packaging_units?: { name: string; contains: number; unit_of_inner: string }[];
 }
 interface WireQuote extends LineInput {
@@ -65,6 +66,8 @@ function normalizeProduct(value: WireProduct): Product {
   return {
     id: value.id, sku_code: value.sku_code, name: value.name, variant: value.description ?? "",
     min_order_qty: value.min_order_qty, image_url: value.image_url ?? undefined,
+    available_quantity: typeof value.available_quantity === "number" && Number.isSafeInteger(value.available_quantity) && value.available_quantity >= 0
+      ? value.available_quantity : undefined,
     sale_unit: unit?.name === "carton" ? "Karton" : unit?.name ?? "Einheit",
     contains: unit?.contains ?? 1, unit_of_inner: unit?.unit_of_inner === "stem" ? "Stiele" : unit?.unit_of_inner ?? "Stück",
   };

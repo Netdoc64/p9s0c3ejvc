@@ -8,6 +8,7 @@ export interface Product {
   unit_of_inner: string;
   min_order_qty: number;
   image_url?: string;
+  available_quantity?: number;
 }
 
 export interface LineInput {
