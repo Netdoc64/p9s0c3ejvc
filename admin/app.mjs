@@ -2,6 +2,7 @@ import { loadDashboard } from "./data.mjs";
 
 import { activeToken, ApiError, endSession, getProfile, live } from "./api.mjs";
 import { errorMessage, showLogin } from "./login.mjs";
+import { renderTeam } from "./team.mjs";
 const money = (/** @type {number} */ cents, /** @type {string} */ currency) =>
   new Intl.NumberFormat("de-DE", { style: "currency", currency }).format(cents / 100);
 /** @param {Awaited<ReturnType<typeof loadDashboard>>} data */
@@ -43,10 +44,11 @@ let sections = [];
 /** @type {import("./api.mjs").StaffProfile | null} */
 let profile = null;
 let ready = false;
+const team = { id: "team", title: "Team" };
 function renderNav() {
   if (!nav) return;
   nav.replaceChildren();
-  for (const section of [overview, ...sections]) {
+  for (const section of [overview, ...sections, ...(profile?.role === "owner" ? [team] : [])]) {
     const link = document.createElement("a");
     link.href = "#" + section.id;
     link.textContent = section.title;
@@ -56,13 +58,18 @@ function renderNav() {
 function render() {
   if (!main || !nav || !ready) return;
   const section = sections.find(s => s.id === location.hash.slice(1));
-  const current = section ?? overview;
+  const teamProfile = location.hash === "#team" && profile?.role === "owner" ? profile : null;
+  const current = teamProfile ? team : section ?? overview;
   document.title = current.title + " · Händler-Dashboard";
   for (const link of nav.querySelectorAll("a")) {
     if (link.hash === "#" + current.id) link.setAttribute("aria-current", "page");
     else link.removeAttribute("aria-current");
   }
   main.replaceChildren(element("h1", current.title));
+  if (teamProfile) {
+    renderTeam(main, teamProfile, () => renderLogin("Die Sitzung ist abgelaufen. Bitte erneut anmelden."));
+    return;
+  }
   if (!section) {
     const cards = element("div");
     cards.className = "cards";

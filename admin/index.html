@@ -16,5 +16,21 @@
     <p role="status"></p>
   </form>
 </template>
+<template id="team-template">
+  <form class="form">
+    <label>E-Mail-Adresse <input name="email" type="email" maxlength="160" required></label>
+    <label>Rolle
+      <select name="role"><option value="staff">Mitarbeiter</option><option value="owner">Inhaber</option></select>
+    </label>
+    <button type="submit">Einladen</button>
+  </form>
+  <p role="status"></p>
+  <div class="panel">
+    <table aria-label="Team">
+      <thead><tr><th>E-Mail</th><th>Rolle</th><th>Status</th><th>Aktion</th></tr></thead>
+      <tbody></tbody>
+    </table>
+  </div>
+</template>
 <script type="module" src="app.mjs"></script>
 </html>

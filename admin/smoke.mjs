@@ -24,6 +24,8 @@ try {
   const livePage = await browser.newPage();
   let signedIn = false;
   let expired = false;
+  let role = "staff";
+  const members = [{ id: "staff_demo", email: "team@handel.example", role: "owner", disabled_at: null }];
   await livePage.route("**/config.mjs", route => route.fulfill({
     contentType: "application/javascript",
     body: `export const config = {apiUrl: ${JSON.stringify(new URL(route.request().url()).origin)}, tenant: "demo"};`,
@@ -43,7 +45,20 @@ try {
     assert.equal(signedIn, true);
     assert.equal(headers.authorization, "Bearer test-token");
     if (expired) return route.fulfill({ status: 401 });
-    if (url.pathname === "/v1/staff/me") return ok({ id: "staff_demo", email: "team@handel.example", role: "staff" });
+    if (url.pathname === "/v1/staff/me") return ok({ id: "staff_demo", email: "team@handel.example", role });
+    if (url.pathname === "/v1/staff") {
+      assert.equal(role, "owner");
+      if (request.method() === "POST") {
+        const { email, role } = request.postDataJSON();
+        if (members.some(member => member.email === email)) return route.fulfill({ status: 409, json: { code: "GH-STAFF-001" } });
+        members.push({ id: "staff_new", email, role, disabled_at: null });
+      }
+      return ok({ data: members });
+    }
+    if (url.pathname === "/v1/staff/staff_new" && request.method() === "DELETE") {
+      members.at(-1).disabled_at = "2026-01-01";
+      return route.fulfill({ status: 204 });
+    }
     if (url.pathname === "/v1/stock/overview") {
       return ok(url.searchParams.has("cursor")
         ? { items: [{ sku_id: "sku_demo", warehouse_id: "wh_second", available: 4, reserved: 1 }], next_cursor: null }
@@ -66,6 +81,25 @@ try {
   await livePage.reload();
   await livePage.getByText("wh_second").waitFor();
   assert.equal(await livePage.evaluate(() => JSON.stringify(localStorage).includes("test-token")), false);
+  assert.equal(await livePage.getByRole("link", { name: "Team" }).count(), 0);
+  await livePage.evaluate(() => { location.hash = "team"; });
+  await livePage.getByRole("heading", { name: "Übersicht" }).waitFor();
+  role = "owner";
+  await livePage.reload();
+  await livePage.getByRole("heading", { name: "Team" }).waitFor();
+  await livePage.getByText("Eigenes Konto").waitFor();
+  await livePage.getByLabel("E-Mail-Adresse").fill("team@handel.example");
+  await livePage.getByRole("button", { name: "Einladen" }).click();
+  await livePage.getByText("Diese E-Mail-Adresse ist bereits im Team eingetragen.").waitFor();
+  await livePage.getByLabel("E-Mail-Adresse").fill("neu@handel.example");
+  await livePage.getByRole("button", { name: "Einladen" }).click();
+  await livePage.getByText("neu@handel.example kann jetzt einen Anmeldecode anfordern.").waitFor();
+  livePage.once("dialog", async dialog => {
+    assert.match(dialog.message(), /neu \(neu@handel\.example\)/);
+    await dialog.accept();
+  });
+  await livePage.getByRole("button", { name: "neu@handel.example sperren" }).click();
+  await livePage.getByRole("row", { name: /neu@handel.example/ }).getByText("Gesperrt").waitFor();
   expired = true;
   await livePage.reload();
   await livePage.getByRole("heading", { name: "Anmelden" }).waitFor();
