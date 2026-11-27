@@ -4,7 +4,17 @@
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>Händler-Dashboard</title>
 <link rel="stylesheet" href="style.css">
-<header><strong>Händler-Dashboard</strong><span>Demo-Betrieb</span></header>
+<header><strong>Händler-Dashboard</strong><div><span id="identity"></span> <button id="sign-out" type="button" hidden>Abmelden</button></div></header>
 <div class="layout"><nav aria-label="Bereiche"></nav><main id="content"></main></div>
+<template id="login-template">
+  <h1>Anmelden</h1>
+  <form class="form">
+    <label>E-Mail-Adresse <input type="email" autocomplete="email" maxlength="160" required></label>
+    <label hidden>Anmeldecode <input name="code" autocomplete="one-time-code" minlength="8" maxlength="8"></label>
+    <button type="submit">Code anfordern</button>
+    <button type="button" hidden>Neuen Code anfordern</button>
+    <p role="status"></p>
+  </form>
+</template>
 <script type="module" src="app.mjs"></script>
 </html>
