@@ -40,6 +40,8 @@ export interface Env {
   // sich keine Zugänge speichern (GH-MODULE-002); gelesen wird dann nur das
   // alte Sammel-Secret.
   MODULE_KEK?: string;
+  // Empfänger der Betriebsalarme (ops-watch). Fehlt er, wird nur protokolliert.
+  OPS_ALERT_EMAIL?: string;
 }
 
 export interface OutboxMessage {

@@ -2,6 +2,7 @@ import type { Env } from "../env";
 import { allJobs, getJobByCron, registerJob } from "./registry";
 import { runJob } from "./runner";
 import { supplierSyncJob } from "./jobs/supplier-sync";
+import { opsWatchJob } from "./jobs/ops-watch";
 import { heartbeatJob } from "./jobs/heartbeat";
 import { fefoRecheckJob } from "./jobs/fefo-recheck";
 import { secretRotationCleanupJob } from "./jobs/secret-rotation-cleanup";
@@ -16,6 +17,7 @@ export function bootstrapCronRegistry(): void {
   if (bootstrapped) return;
   registerJob(heartbeatJob);
   registerJob(supplierSyncJob);
+  registerJob(opsWatchJob);
   registerJob(fefoRecheckJob);
   registerJob(secretRotationCleanupJob);
   registerJob(pricingFeedPullJob);

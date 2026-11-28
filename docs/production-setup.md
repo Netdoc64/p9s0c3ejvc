@@ -100,6 +100,7 @@ braucht; optional sind die Lieferanten-Anbindungen.
 | `KOMANDER_CONNECTIONS` | nein | Variable | Lieferanten-Anbindung |
 | `FLEUROP_NL_CONNECTIONS` | nein | Variable | Lieferanten-Anbindung |
 | `FSN_CONNECTIONS` | nein | Variable | Lieferanten-Anbindung |
+| `OPS_ALERT_EMAIL` | empfohlen | Secret | Empfänger der Betriebsalarme (Job `ops-watch`, alle 15 min): pausierte Jobs, altes Backup, Outbox-Stau, Lieferanten-Modulfehler, Einkaufsaufgaben. Gemeldet wird nur bei Änderung. Ohne Wert nur Protokoll; Lage jederzeit unter `GET /admin/ops/alarms` |
 | `MODULE_KEK` | ja, sobald Händler Zugänge selbst pflegen | Secret | Hauptschlüssel (64 Hex) für die verschlüsselten Modul-Zugänge; vom Business Manager gewürfelt. Wechsel macht gespeicherte Zugänge unlesbar |
 | `ADMIN_API_KEY` | nein | Secret | Schlüssel für `/admin/*` (nur der Schlüsselspeicher ruft das). Fehlt er, sind die Admin-Endpunkte aus (503), nicht offen. Mindestens 32 Zeichen |
 
