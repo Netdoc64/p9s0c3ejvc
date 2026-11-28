@@ -1,4 +1,5 @@
 import { Hono } from "hono";
+import { ownerOnly } from "../middleware/tenant-auth";
 import type { AppContext } from "../env";
 import { CodedError } from "../errors/catalog";
 import { getDb } from "../db/client";
@@ -107,7 +108,7 @@ productsRoutes.patch("/:id", async (c) => {
   return c.json(sanitize(updated));
 });
 
-productsRoutes.delete("/:id", async (c) => {
+productsRoutes.delete("/:id", ownerOnly(), async (c) => {
   const tenant_id = tenantId(c);
   const id = c.req.param("id");
   const db = getDb(c.env.DB);
@@ -116,7 +117,7 @@ productsRoutes.delete("/:id", async (c) => {
   return c.body(null, 204);
 });
 
-productsRoutes.post("/import", async (c) => {
+productsRoutes.post("/import", ownerOnly(), async (c) => {
   const tenant_id = tenantId(c);
   const body = c.req.raw.body;
   if (!body) throw new CodedError("GH-INPUT-001", { reason: "missing body" });

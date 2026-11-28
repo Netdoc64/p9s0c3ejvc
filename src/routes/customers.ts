@@ -1,4 +1,5 @@
 import { Hono } from "hono";
+import { ownerOnly } from "../middleware/tenant-auth";
 import type { AppContext } from "../env";
 import { CodedError } from "../errors/catalog";
 import { getDb } from "../db/client";
@@ -121,7 +122,7 @@ customersRoutes.get("/", async (c) => {
   });
 });
 
-customersRoutes.delete("/:id", async (c) => {
+customersRoutes.delete("/:id", ownerOnly(), async (c) => {
   const tenant_id = tenantId(c);
   const id = c.req.param("id");
   const db = getDb(c.env.DB);

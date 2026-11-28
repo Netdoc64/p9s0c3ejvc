@@ -19,7 +19,14 @@ import { auth } from "./auth";
 export const tenantAuth = (): MiddlewareHandler<AppContext> => {
   const hmac = auth();
   return async (c, next) => {
-    if (c.req.header("X-Api-Key")) return hmac(c, next);
+    if (c.req.header("X-Api-Key")) {
+      // Ein Key mit Scope "read" darf nur lesen. Unbekannte Scopes gelten als "read" — nie als mehr.
+      return hmac(c, async () => {
+        const scope = c.var.api_key_scope ?? "full";
+        if (scope !== "full" && !["GET", "HEAD"].includes(c.req.method)) throw new CodedError("GH-AUTH-004");
+        await next();
+      });
+    }
     const header = c.req.header("Authorization");
     if (!header?.startsWith("Bearer ")) throw new CodedError("GH-AUTH-001");
     const token = header.slice("Bearer ".length).trim();

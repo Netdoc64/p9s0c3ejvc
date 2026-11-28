@@ -1,4 +1,5 @@
 import { Hono } from "hono";
+import { ownerOnly } from "../middleware/tenant-auth";
 import { z } from "zod";
 import type { AppContext } from "../env";
 import { moduleRow } from "../modules/resolve";
@@ -51,7 +52,7 @@ async function fileConnection(c: RequestContext) {
   return snapshotConnection(tenant, parse(snapshotSource, c.req.param("source")));
 }
 
-suppliersRoutes.post("/imports/:source", async (c) => {
+suppliersRoutes.post("/imports/:source", ownerOnly(), async (c) => {
   const key = await fileConnection(c);
   const input = parse(snapshotInput, await parseJsonBody(c));
   c.header("Cache-Control", "private, no-store");
@@ -88,7 +89,7 @@ for (const stream of ["catalog", "offers"] as const) {
   });
 }
 
-suppliersRoutes.post("/floriday/purchase-orders", async (c) => {
+suppliersRoutes.post("/floriday/purchase-orders", ownerOnly(), async (c) => {
   const { client, key } = await connection(c);
   if (!client.orderingEnabled) throw new CodedError("GH-SUPPLIER-001", { reason: "ordering_disabled" });
   const input = parse(purchaseInput, await parseJsonBody(c));
@@ -100,7 +101,7 @@ suppliersRoutes.get("/floriday/purchase-orders/:id", async (c) => {
   return c.json(publicOrder(await requirePurchase(c.env.DB, key, parse(uuid, c.req.param("id")))));
 });
 
-suppliersRoutes.post("/floriday/purchase-orders/:id/submit", async (c) => {
+suppliersRoutes.post("/floriday/purchase-orders/:id/submit", ownerOnly(), async (c) => {
   const { client, key } = await connection(c);
   const id = parse(uuid, c.req.param("id"));
   return c.json(publicOrder(await supplierCall(() => submitPurchase(c.env.DB, key, client, id))));
@@ -133,7 +134,7 @@ suppliersRoutes.get("/komander/availability", async (c) => {
   return c.json(await supplierCall(() => client.read("availability", query), "komander"));
 });
 
-suppliersRoutes.post("/komander/checkout", async (c) => {
+suppliersRoutes.post("/komander/checkout", ownerOnly(), async (c) => {
   const { client, checkoutEnabled } = await komanderConnection(c);
   if (!checkoutEnabled) throw new CodedError("GH-SUPPLIER-001", { reason: "ordering_disabled" });
   const input = parse(komanderCheckout, await parseJsonBody(c));
@@ -182,7 +183,7 @@ suppliersRoutes.get("/fleurop-nl/delivery-costs", async (c) => {
   return c.json(await supplierCall(() => client.costs(query), "fleurop-nl"));
 });
 
-suppliersRoutes.post("/fleurop-nl/orders", async (c) => {
+suppliersRoutes.post("/fleurop-nl/orders", ownerOnly(), async (c) => {
   const { tenant, client } = await fleuropConnection(c);
   const input = parse(fleuropOrder, await parseJsonBody(c));
   c.header("Cache-Control", "no-store");
@@ -236,7 +237,7 @@ suppliersRoutes.get("/flower-shop-network/florists", async (c) => {
   return c.json(await supplierCall(() => client.florists(query), "flower-shop-network"));
 });
 
-suppliersRoutes.post("/flower-shop-network/orders", async (c) => {
+suppliersRoutes.post("/flower-shop-network/orders", ownerOnly(), async (c) => {
   const { client, scope } = await fsnConnection(c);
   if (!client.orderingEnabled) throw new CodedError("GH-SUPPLIER-001", { reason: "ordering_disabled" });
   const input = parse(fsnOrderInput, await parseJsonBody(c));
