@@ -33,6 +33,9 @@ jobs:
             mobile/package-lock.json
             admin/package-lock.json
 
+      - name: Fehlermeldungen der Kunden-App prüfen
+        run: node --test mobile/tests/request-failure.mjs
+
       - name: Frontend-Plan prüfen
         run: node scripts/check-frontend-plan.mjs
 
