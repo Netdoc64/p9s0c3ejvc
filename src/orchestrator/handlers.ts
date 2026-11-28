@@ -266,6 +266,22 @@ const awaitConfirmationHandler: Handler = async (doc, { step, now }) => {
 };
 
 const commitStockHandler: Handler = async (doc, { env, step, now }) => {
+  // Lieferanten-Positionen zuerst neu prüfen: das Angebot kann seit der Reservierung abgelaufen,
+  // ausverkauft oder ersetzt sein. Dann hält die Bestellung an, BEVOR etwas aus dem Lager gebucht wird.
+  const stale = [];
+  for (const line of doc.lines) {
+    const src = lineSource(line);
+    if (!src) continue;
+    const now2 = await sourceForLine(env, doc.meta.tenant_id, line.sku_id, line.qty);
+    if (!now2 || now2.provider !== src.provider || now2.connection !== src.connection || now2.source_ref !== src.source_ref) {
+      stale.push({ code: "GH-STOCK-001", detail: `${line.sku_id}: Lieferanten-Quelle nicht mehr verfügbar`, line_no: line.line_no });
+    }
+  }
+  if (stale.length) {
+    let held = moveToHold(doc, stale);
+    held = appendExecuted(held, step, now, new Date().toISOString(), "supplier_source_gone", { lines: stale.length }, "GH-STOCK-001");
+    return { doc: held, blocked: true };
+  }
   for (const line of doc.lines) {
     if (lineSource(line)) continue;
     if (!line.reservation_id) throw new CodedError("GH-STOCK-002", { line_no: line.line_no });

@@ -135,6 +135,26 @@ describe("Mitarbeiter-Anmeldung", () => {
   });
 });
 
+describe("Review-Funde: Rechte", () => {
+  it("einfache Mitarbeiter dürfen keine Webhooks anlegen und nicht pseudonymisieren", async () => {
+    await addViaAdmin("chef@firma.example");
+    const owner = await login("chef@firma.example");
+    await SELF.fetch(`${BASE}/v1/staff`, { method: "POST", headers: { ...bearer(owner), "Content-Type": "application/json" }, body: JSON.stringify({ email: "lager@firma.example" }) });
+    const lager = await login("lager@firma.example");
+    const h = { ...bearer(lager), "Content-Type": "application/json" };
+    expect((await SELF.fetch(`${BASE}/v1/webhooks`, { method: "POST", headers: h, body: JSON.stringify({ url: "https://hooks.example.com/x", topic_filter: "*" }) })).status).toBe(403);
+    expect((await SELF.fetch(`${BASE}/v1/dsgvo/pseudonymize-customer`, { method: "POST", headers: h, body: JSON.stringify({ customer_id: "cust_x" }) })).status).toBe(403);
+  });
+
+  it("höchstens 5 Codes je Mitarbeiter in 15 Minuten", async () => {
+    await addViaAdmin("chef@firma.example");
+    const { requestStaffCode: req } = await import("../../src/auth/staff");
+    const results = [];
+    for (let i = 0; i < 7; i++) results.push((await req(env as never, t.tenant_id, "chef@firma.example")).code);
+    expect(results.filter(Boolean)).toHaveLength(5);
+  });
+});
+
 describe("Dashboard-Verträge (#34)", () => {
   it("Einlösen liefert tenant_id und roles", async () => {
     await addViaAdmin("chef@firma.example");

@@ -8,6 +8,7 @@ import { webhook_subscriptions } from "../db/schema/webhooks";
 import { newId } from "../lib/ids";
 import { randomSecret } from "../lib/crypto";
 import { validatePublicHttpsUrl } from "../lib/url-validation";
+import { ownerOnly } from "../middleware/tenant-auth";
 
 export const webhooksRoutes = new Hono<AppContext>();
 
@@ -20,7 +21,8 @@ const CreateSchema = z.object({
   description: z.string().max(200).optional(),
 }).strict();
 
-webhooksRoutes.post("/", async (c) => {
+// Ein Webhook leitet Bestelldaten an eine fremde Adresse weiter — das darf nur ein Inhaber.
+webhooksRoutes.post("/", ownerOnly(), async (c) => {
   const tenant_id = c.var.tenant_id;
   if (!tenant_id) throw new CodedError("GH-AUTH-001");
   const body = await c.req.json();
@@ -53,7 +55,7 @@ webhooksRoutes.get("/", async (c) => {
   return c.json({ items: rows.map((r) => ({ id: r.id, url: r.url, topic_filter: r.topic_filter, active: r.active === 1, description: r.description, created_at: r.created_at })) });
 });
 
-webhooksRoutes.delete("/:id", async (c) => {
+webhooksRoutes.delete("/:id", ownerOnly(), async (c) => {
   const tenant_id = c.var.tenant_id;
   if (!tenant_id) throw new CodedError("GH-AUTH-001");
   const id = c.req.param("id");
