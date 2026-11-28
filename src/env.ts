@@ -77,4 +77,6 @@ export interface AppVariables {
   scopes?: string[];
   staff_id?: string;
   staff_role?: "owner" | "staff";
+  /** Scope des API-Keys (`full` | `read`); bei Mitarbeiter-Token leer. */
+  api_key_scope?: string;
 }

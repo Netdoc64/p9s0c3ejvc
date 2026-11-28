@@ -143,6 +143,8 @@ gelten dort nie, Mitarbeiter-Tokens nie in `/v1/customer/*`.
 | ersten Inhaber anlegen | `POST /admin/tenants/<slug>/staff` mit `X-Admin-Key`, Body `{ "email": … }` |
 | Code anfordern | `POST /v1/auth/staff/code/request`, Header `X-Tenant-Slug`, Body `{ "email": … }` |
 | Code einlösen | `POST /v1/auth/staff/code/verify`, Body `{ "email", "code" }` → `access_token` |
+| Rollen | Inhaber: alles. Mitarbeiter: lesen, Bestellungen, Bestand, Kunden und Artikel anlegen/ändern. **Nur Inhaber:** Löschen von Kunden und Artikeln, Massenimport, Lieferanten-Dateien hochladen, alles Geldwirksame beim Lieferanten (Floriday-Bestellung, Komander-Checkout, Fleurop/FSN-Bestellungen, Einkauf senden), Module, Preisregeln, Webhooks, DSGVO, Team |
+| API-Key-Scope | `full` = wie Inhaber, `read` = nur GET |
 | Leute verwalten (nur Inhaber) | `GET/POST /v1/staff`, `DELETE /v1/staff/<id>` (sperrt sofort) |
 
 ## 4. GitHub-Environment `production`

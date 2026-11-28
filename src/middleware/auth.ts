@@ -53,6 +53,7 @@ export const auth = (): MiddlewareHandler<AppContext> => async (c, next) => {
       hmac_secret: api_keys.hmac_secret,
       hmac_secret_previous: api_keys.hmac_secret_previous,
       hmac_secret_previous_until: api_keys.hmac_secret_previous_until,
+      scope: api_keys.scope,
       tenant_status: tenants.status,
     })
     .from(api_keys)
@@ -113,5 +114,6 @@ export const auth = (): MiddlewareHandler<AppContext> => async (c, next) => {
 
   c.set("tenant_id", found.tenant_id);
   c.set("api_key_id", found.id);
+  c.set("api_key_scope", found.scope);
   await next();
 };
