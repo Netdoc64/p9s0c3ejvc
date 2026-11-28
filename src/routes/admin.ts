@@ -12,6 +12,7 @@ import { sha256Hex, constantTimeEqualHex } from "../lib/crypto";
 import { issueTenantKey } from "../services/api-key-issuance";
 import { addStaff } from "../auth/staff";
 import { moduleDef } from "../modules/registry";
+import { evaluate, fingerprint } from "../ops/watch";
 
 export const MIN_ADMIN_KEY_LENGTH = 32;
 
@@ -91,4 +92,11 @@ adminRoutes.put("/tenants/:slug/modules/:id", async (c) => {
     ON CONFLICT (tenant_id, module_id) DO UPDATE SET available = excluded.available, enabled = CASE WHEN excluded.available = 0 THEN 0 ELSE enabled END, updated_at = excluded.updated_at`)
     .bind(tenant.id, def.id, body.available ? 1 : 0, now).run();
   return c.json({ module: def.id, available: body.available });
+});
+
+/** Betreiber: aktuelle Alarmlage (dieselbe Bewertung wie der Wächter, ohne Mail). */
+adminRoutes.get("/ops/alarms", async (c) => {
+  const firing = await evaluate(c.env);
+  c.header("Cache-Control", "no-store");
+  return c.json({ firing, fingerprint: await fingerprint(firing), checked_at: new Date().toISOString() });
 });
