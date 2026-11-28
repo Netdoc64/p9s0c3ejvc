@@ -13,7 +13,7 @@
  */
 import type { Env } from "../env";
 import { CodedError } from "../errors/catalog";
-import { sha256Hex } from "../lib/crypto";
+import { hmacSha256Hex, sha256Hex } from "../lib/crypto";
 
 const enc = new TextEncoder();
 const dec = new TextDecoder();
@@ -36,6 +36,10 @@ function kekBytes(env: Env): Uint8Array {
   const out = new Uint8Array(32);
   for (let i = 0; i < 32; i++) out[i] = parseInt(hex.slice(i * 2, i * 2 + 2), 16);
   return out;
+}
+
+async function fingerprintKey(env: Env): Promise<string> {
+  return sha256Hex(`fingerprint:${env.MODULE_KEK ?? ""}`);
 }
 
 export function kekConfigured(env: Env): boolean {
@@ -62,8 +66,9 @@ export async function seal(env: Env, tenantId: string, moduleId: string, secrets
   const key = await recordKey(env, salt, context);
   const plain = JSON.stringify(Object.fromEntries(Object.entries(secrets).sort(([a], [b]) => a.localeCompare(b))));
   const ct = new Uint8Array(await crypto.subtle.encrypt({ name: "AES-GCM", iv, additionalData: enc.encode(context) }, key, enc.encode(plain)));
-  // Abdruck wie im Business Manager: 12 Hex-Zeichen, gebunden an Tenant und Modul.
-  const fingerprint = (await sha256Hex(`${context}:${plain}`)).slice(0, 12);
+  // Abdruck: 12 Hex-Zeichen, als HMAC mit einem aus dem KEK abgeleiteten Schlüssel — ohne den
+  // Schlüssel lässt sich ein schwacher Wert nicht offline aus dem Abdruck erraten.
+  const fingerprint = (await hmacSha256Hex(await fingerprintKey(env), `${context}:${plain}`)).slice(0, 12);
   return { salt: b64(salt), iv: b64(iv), ciphertext: b64(ct), fingerprint };
 }
 

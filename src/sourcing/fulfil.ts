@@ -28,8 +28,14 @@ export async function sourceForLine(env: Env, tenantId: string, skuId: string, q
         AND ps.connection = st.connection AND ps.source_ref = st.source_ref
       WHERE st.tenant_id = ? AND st.sku_id = ? AND st.provider IS NOT NULL`,
   ).bind(tenantId, skuId).first<{ provider: string; connection: string; source_ref: string; cost_cents: number; available_units: number; delivery_from: string | null; expires_at: string | null; pack_factor: number }>();
-  if (!s || s.available_units < qty) return null;
+  if (!s) return null;
   if (s.expires_at && s.expires_at <= new Date().toISOString()) return null;
+  // Noch nicht gesendete Anforderungen derselben Quelle sind schon zugesagt: abziehen, sonst
+  // verkaufen zehn Bestellungen dieselben 50 Stück zehnmal.
+  const open = await env.DB.prepare(`SELECT COALESCE(SUM(qty), 0) AS n FROM supplier_purchase_requests
+      WHERE tenant_id = ? AND sku_id = ? AND provider = ? AND connection = ? AND source_ref = ? AND status = 'open'`)
+    .bind(tenantId, skuId, s.provider, s.connection, s.source_ref).first<{ n: number }>();
+  if (s.available_units - (open?.n ?? 0) < qty) return null;
   return { provider: s.provider, connection: s.connection, source_ref: s.source_ref, cost_cents: s.cost_cents, pack: s.pack_factor, delivery_from: s.delivery_from };
 }
 

@@ -57,6 +57,11 @@ export async function requestStaffCode(env: Env, tenant_id: string, emailRaw: st
     await sha256Hex(`${tenant_id}:dummy:${code}`);
     return { staff_id: null, ttl_sec: CODE_TTL_SEC };
   }
+  // Höchstens 5 Codes je Mitarbeiter in 15 Minuten, egal von wie vielen Adressen angefordert.
+  // Sonst entwertet eine Flut von Anforderungen jeden Code, bevor er ankommt. Antwort bleibt gleich.
+  const recent = await env.DB.prepare("SELECT COUNT(*) AS n FROM staff_login_codes WHERE staff_id = ? AND created_at > ?")
+    .bind(row.id, new Date(Date.now() - 15 * 60_000).toISOString()).first<{ n: number }>();
+  if ((recent?.n ?? 0) >= 5) return { staff_id: null, ttl_sec: CODE_TTL_SEC };
   const now = new Date();
   await env.DB.batch([
     env.DB.prepare("UPDATE staff_login_codes SET consumed_at = ? WHERE staff_id = ? AND consumed_at IS NULL").bind(now.toISOString(), row.id),

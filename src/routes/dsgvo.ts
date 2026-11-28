@@ -1,4 +1,5 @@
 import { Hono } from "hono";
+import { ownerOnly } from "../middleware/tenant-auth";
 import { z } from "zod";
 import type { AppContext } from "../env";
 import { CodedError } from "../errors/catalog";
@@ -17,7 +18,8 @@ const PseudonymizeSchema = z.object({
   reason: z.string().min(20).max(500),
 }).strict();
 
-dsgvoRoutes.post("/pseudonymize-customer", async (c) => {
+// Unumkehrbar — nur ein Inhaber.
+dsgvoRoutes.post("/pseudonymize-customer", ownerOnly(), async (c) => {
   const tenant_id = c.var.tenant_id;
   if (!tenant_id) throw new CodedError("GH-AUTH-001");
   const body = await c.req.json();

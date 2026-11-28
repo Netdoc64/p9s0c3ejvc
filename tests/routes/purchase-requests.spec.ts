@@ -135,3 +135,39 @@ describe("Quellenmix Teil 2: Kundenbestellung aus Lieferanten-Quelle", () => {
     expect(await (await api("POST", `/v1/purchase-orders/${f.id}/cancel`)).json()).toMatchObject({ status: "cancelled" });
   });
 });
+
+describe("Review-Funde: Einkauf", () => {
+  it("dieselbe Lieferantenmenge wird nicht zweimal zugesagt", async () => {
+    await product("sku_g", 0);
+    await source("sku_g", 50);
+    const first = await run("reserve_stock", doc([{ sku_id: "sku_g", qty: 40 }]));
+    await run("commit_stock", first.doc);
+    const second = await run("reserve_stock", { ...doc([{ sku_id: "sku_g", qty: 40 }]), meta: { ...doc([]).meta, id: "ord_po2" } } as OrderDoc);
+    expect(second.blocked).toBe(true);
+  });
+
+  it("ist die Quelle beim Bestätigen weg, hält die Bestellung an statt zu bestätigen", async () => {
+    await product("sku_h", 0);
+    await source("sku_h", 50);
+    const { doc: reserved } = await run("reserve_stock", doc([{ sku_id: "sku_h", qty: 5 }]));
+    await env.DB.prepare("UPDATE product_sourcing_state SET expires_at = '2000-01-01T00:00:00.000Z'").run();
+    const res = await run("commit_stock", reserved);
+    expect(res.blocked).toBe(true);
+    expect(res.doc.state.current).toBe("on_hold");
+    expect((await env.DB.prepare("SELECT COUNT(*) AS n FROM supplier_purchase_requests").first<{ n: number }>())?.n).toBe(0);
+  });
+
+  it("CSV entschärft Formeln, ungültiger Quellname wird abgewiesen", async () => {
+    await product("sku_i", 0);
+    await env.DB.batch([
+      env.DB.prepare("INSERT INTO product_sources (tenant_id, sku_id, provider, connection, source_ref, pack_factor, created_at) VALUES (?, 'sku_i', 'file-import', 'lieferant-a', '=HYPERLINK(1)', 1, ?)").bind(t.tenant_id, now()),
+      env.DB.prepare(`INSERT INTO product_sourcing_state (tenant_id, sku_id, provider, connection, source_ref, cost_cents, price_cents, available_units, expires_at, reason, computed_at)
+        VALUES (?, 'sku_i', 'file-import', 'lieferant-a', '=HYPERLINK(1)', 30, 99, 10, ?, 'cheapest', ?)`).bind(t.tenant_id, future(), now()),
+    ]);
+    const { doc: reserved } = await run("reserve_stock", doc([{ sku_id: "sku_i", qty: 1 }]));
+    await run("commit_stock", reserved);
+    const csv = await (await api("GET", "/v1/purchase-orders/export?connection=lieferant-a")).text();
+    expect(csv).toContain("'=HYPERLINK(1);1;1");
+    expect((await api("GET", "/v1/purchase-orders/export?connection=a%22b")).status).toBe(400);
+  });
+});

@@ -13,6 +13,7 @@ import { ownerOnly } from "../middleware/tenant-auth";
 import { FloridayClient, floridayConfig, type FloridayOffer } from "../integrations/floriday";
 import { createPurchase, submitPurchase } from "../integrations/purchase-orders";
 import { supplierRecord } from "../integrations/supplier-sync";
+import { toCents } from "../sourcing/offers";
 
 export const purchaseRequestsRoutes = new Hono<AppContext>();
 
@@ -50,6 +51,8 @@ const FloridaySend = z.object({
   payment_provider: z.enum(["RFH", "VRM", "PLANTION", "FX_SERVICES", "OTHER"]),
   packing_index: z.number().int().nonnegative().default(0),
   reference: z.string().min(1).max(26).optional(),
+  /** Ausdrücklich bestätigen, dass zu einem höheren Preis als kalkuliert bestellt wird. */
+  accept_price_increase: z.boolean().default(false),
 }).strict();
 
 purchaseRequestsRoutes.post("/:id/send", ownerOnly(), async (c) => {
@@ -59,7 +62,9 @@ purchaseRequestsRoutes.post("/:id/send", ownerOnly(), async (c) => {
 
   if (r.provider === "file-import") {
     // Datei-Lieferanten haben keine Schnittstelle: übermittelt wird per Bestellliste (CSV).
-    await c.env.DB.prepare("UPDATE supplier_purchase_requests SET status = 'sent', note = 'per Bestellliste übermittelt', updated_at = ? WHERE id = ? AND status = 'open'").bind(now, r.id).run();
+    const done = await c.env.DB.prepare("UPDATE supplier_purchase_requests SET status = 'sent', note = 'per Bestellliste übermittelt', updated_at = ? WHERE id = ? AND tenant_id = ? AND status = 'open'")
+      .bind(now, r.id, r.tenant_id).run();
+    if (!done.meta.changes) throw new CodedError("GH-SUPPLIER-003", { reason: "status_changed" });
     return c.json(await requireReq(c, r.id));
   }
   if (r.provider !== "floriday") throw new CodedError("GH-SUPPLIER-001", { reason: "provider_unsupported" });
@@ -73,12 +78,20 @@ purchaseRequestsRoutes.post("/:id/send", ownerOnly(), async (c) => {
   if (key.connection !== r.connection) throw new CodedError("GH-SUPPLIER-003", { reason: "connection_changed" });
   const offer = await supplierRecord<FloridayOffer>(c.env.DB, key, "offers", r.source_ref);
   if (!offer) throw new CodedError("GH-SUPPLIER-002");
-
-  // Dieselbe Kennung bei jedem Versuch: Floriday bekommt nie eine zweite Bestellung für dieselbe Anforderung.
-  const orderId = r.supplier_order_id ?? crypto.randomUUID();
-  if (!r.supplier_order_id) {
-    await c.env.DB.prepare("UPDATE supplier_purchase_requests SET supplier_order_id = ?, updated_at = ? WHERE id = ? AND supplier_order_id IS NULL").bind(orderId, now, r.id).run();
+  // Teurer als kalkuliert? Dann nur mit ausdrücklicher Bestätigung — sonst schmilzt die Marge unbemerkt.
+  const offerCents = toCents(offer.pricePerPiece.value);
+  if (offerCents > r.cost_cents && !parsed.data.accept_price_increase) {
+    throw new CodedError("GH-SUPPLIER-003", { reason: "price_increased", calculated_cents: r.cost_cents, offer_cents: offerCents });
   }
+
+  // Dieselbe Kennung bei JEDEM Versuch, auch bei zwei gleichzeitigen: die Kennung wird atomar
+  // beansprucht und danach nur der gespeicherte Wert benutzt. createPurchase ist je Kennung
+  // idempotent, submitPurchase sendet je Kennung höchstens einmal — so entsteht keine zweite Bestellung.
+  await c.env.DB.prepare("UPDATE supplier_purchase_requests SET supplier_order_id = COALESCE(supplier_order_id, ?), updated_at = ? WHERE id = ? AND tenant_id = ? AND status = 'open'")
+    .bind(crypto.randomUUID(), now, r.id, r.tenant_id).run();
+  const claimed = await requireReq(c, r.id);
+  if (claimed.status !== "open" || !claimed.supplier_order_id) throw new CodedError("GH-SUPPLIER-003", { reason: `status_${claimed.status}` });
+  const orderId = claimed.supplier_order_id;
   try {
     await createPurchase(c.env.DB, key, {
       id: orderId, offer_id: r.source_ref, number_of_pieces: r.source_qty, packing_index: parsed.data.packing_index,
@@ -88,11 +101,13 @@ purchaseRequestsRoutes.post("/:id/send", ownerOnly(), async (c) => {
       reference: parsed.data.reference ?? r.order_id.slice(-26),
     });
     const po = await submitPurchase(c.env.DB, key, client, orderId);
-    await c.env.DB.prepare("UPDATE supplier_purchase_requests SET status = 'sent', note = ?, updated_at = ? WHERE id = ?")
-      .bind(`Floriday: ${po.status}`, new Date().toISOString(), r.id).run();
+    // Wurde inzwischen storniert, bleibt der Storno sichtbar: dann ist es ein Storno beim Lieferanten.
+    await c.env.DB.prepare(`UPDATE supplier_purchase_requests SET status = CASE WHEN status = 'cancelled' THEN 'cancel_requested' ELSE 'sent' END,
+        note = ?, updated_at = ? WHERE id = ? AND tenant_id = ? AND status IN ('open', 'cancelled')`)
+      .bind(`Floriday: ${po.status}`, new Date().toISOString(), r.id, r.tenant_id).run();
   } catch (err) {
     const reason = err instanceof CodedError ? `${err.code} ${String((err.detail as { reason?: string } | undefined)?.reason ?? "")}`.trim() : "Senden fehlgeschlagen";
-    await c.env.DB.prepare("UPDATE supplier_purchase_requests SET note = ?, updated_at = ? WHERE id = ?").bind(reason, new Date().toISOString(), r.id).run();
+    await c.env.DB.prepare("UPDATE supplier_purchase_requests SET note = ?, updated_at = ? WHERE id = ? AND tenant_id = ?").bind(reason, new Date().toISOString(), r.id, r.tenant_id).run();
     throw err;
   }
   return c.json(await requireReq(c, r.id));
@@ -101,10 +116,11 @@ purchaseRequestsRoutes.post("/:id/send", ownerOnly(), async (c) => {
 purchaseRequestsRoutes.post("/:id/cancel", ownerOnly(), async (c) => {
   const r = await requireReq(c, c.req.param("id"));
   if (r.status === "open") {
-    await c.env.DB.prepare("UPDATE supplier_purchase_requests SET status = 'cancelled', updated_at = ? WHERE id = ?").bind(new Date().toISOString(), r.id).run();
+    await c.env.DB.prepare("UPDATE supplier_purchase_requests SET status = 'cancelled', updated_at = ? WHERE id = ? AND tenant_id = ? AND status = 'open'").bind(new Date().toISOString(), r.id, r.tenant_id).run();
   } else if (r.status === "cancel_requested") {
     // Der Mensch bestätigt, dass beim Lieferanten storniert wurde.
-    await c.env.DB.prepare("UPDATE supplier_purchase_requests SET status = 'cancelled', note = 'beim Lieferanten storniert (bestätigt)', updated_at = ? WHERE id = ?").bind(new Date().toISOString(), r.id).run();
+    await c.env.DB.prepare("UPDATE supplier_purchase_requests SET status = 'cancelled', note = 'beim Lieferanten storniert (bestätigt)', updated_at = ? WHERE id = ? AND tenant_id = ? AND status = 'cancel_requested'")
+      .bind(new Date().toISOString(), r.id, r.tenant_id).run();
   } else {
     throw new CodedError("GH-SUPPLIER-003", { reason: `status_${r.status}` });
   }
@@ -114,11 +130,15 @@ purchaseRequestsRoutes.post("/:id/cancel", ownerOnly(), async (c) => {
 /** Bestellliste für einen Datei-Lieferanten: offene Anforderungen je Artikel zusammengefasst (CSV). */
 purchaseRequestsRoutes.get("/export", async (c) => {
   const connection = c.req.query("connection");
-  if (!connection) throw new CodedError("GH-INPUT-001", { field: "connection" });
+  if (!connection || !/^[a-z0-9]+(?:-[a-z0-9]+)*$/.test(connection) || connection.length > 64) throw new CodedError("GH-INPUT-001", { field: "connection" });
   const rows = await c.env.DB.prepare(`SELECT source_ref, SUM(source_qty) AS qty, COUNT(*) AS positions FROM supplier_purchase_requests
       WHERE tenant_id = ? AND provider = 'file-import' AND connection = ? AND status = 'open' GROUP BY source_ref ORDER BY source_ref`)
     .bind(c.var.tenant_id, connection).all<{ source_ref: string; qty: number; positions: number }>();
-  const esc = (v: string) => /[",;\n]/.test(v) ? `"${v.replace(/"/g, '""')}"` : v;
+  // Tabellenprogramme führen Zellen mit = + - @ als Formel aus: mit ' entschärfen. Dann quoten, wo nötig.
+  const esc = (raw: string) => {
+    const v = /^[=+\-@\t\r]/.test(raw) ? `'${raw}` : raw;
+    return /[",;\n\r]/.test(v) ? `"${v.replace(/"/g, '""')}"` : v;
+  };
   const csv = ["sku;menge;positionen", ...(rows.results ?? []).map((r) => `${esc(r.source_ref)};${r.qty};${r.positions}`)].join("\n") + "\n";
   return c.body(csv, 200, { "Content-Type": "text/csv; charset=utf-8", "Content-Disposition": `attachment; filename="bestellliste-${connection}.csv"` });
 });
