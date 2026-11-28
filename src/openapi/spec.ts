@@ -1183,6 +1183,7 @@ const CUSTOMER_PRODUCT: JsonSchema = {
   properties: {
     id: { type: "string" }, sku_code: { type: "string" }, name: { type: "string" }, description: { type: ["string", "null"] },
     min_order_qty: { type: "integer" }, packaging_units: { type: "array" }, attributes: { type: "object" }, image_url: { type: ["string", "null"] },
+    available_quantity: { type: ["integer", "null"], minimum: 0, description: "Bestellbare Menge in Verkaufseinheiten auf einmal: das Maximum aus Eigenbestand (Standardlager) und gültiger Lieferanten-Quelle, nicht die Summe, weil eine Position nicht geteilt wird. 0 = derzeit nicht verfügbar, null = unbekannt." },
   },
 };
 
