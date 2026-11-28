@@ -24,6 +24,7 @@ import { resolvePricingFromDb } from "../services/pricing-resolver";
 import { newId } from "../lib/ids";
 import { isSettled, readOperation, runOperation, settlePending, type CheckoutOperation } from "../services/customer-order-operations";
 import * as orders from "../services/customer-orders";
+import { availableQuantities } from "../sourcing/availability";
 
 export const customerApiRoutes = new Hono<AppContext>();
 
@@ -53,7 +54,7 @@ async function imageUrls(c: Context<AppContext>, tenant_id: string, ids: string[
   return out;
 }
 
-function productView(p: Product, images: Record<string, string> = {}) {
+function productView(p: Product, images: Record<string, string> = {}, available: Record<string, number | null> = {}) {
   const json = (s: string, fallback: unknown) => { try { return JSON.parse(s) as unknown; } catch { return fallback; } };
   return {
     id: p.id,
@@ -64,6 +65,8 @@ function productView(p: Product, images: Record<string, string> = {}) {
     packaging_units: json(p.packaging_units, []),
     attributes: json(p.attributes, {}),
     image_url: images[p.id] ?? null,
+    // Bestellbare Menge in Verkaufseinheiten; null = gerade nicht ermittelbar.
+    available_quantity: available[p.id] ?? null,
   };
 }
 
@@ -96,7 +99,8 @@ customerApiRoutes.get("/products", async (c) => {
   if (parsed.data.q) {
     const items = (await productsRepo.search(db, s.tenant_id, parsed.data.q, limit)).filter((p) => p.status === "active");
     const imgs = await imageUrls(c, s.tenant_id, items.map((p) => p.id));
-    return c.json({ items: items.map((p) => productView(p, imgs)), next_cursor: null });
+    const avail = await availableQuantities(c.env, s.tenant_id, items.map((p) => p.id));
+    return c.json({ items: items.map((p) => productView(p, imgs, avail)), next_cursor: null });
   }
   const cursor = await parseCursor(c.env, parsed.data.cursor);
   const rows = await productsRepo.list(db, s.tenant_id, { cursor, limit });
@@ -104,14 +108,15 @@ customerApiRoutes.get("/products", async (c) => {
   const next_cursor = rows.length === limit && last ? await signCursor(c.env, { created_at: last.created_at, id: last.id }) : null;
   const active = rows.filter((p) => p.status === "active");
   const imgs = await imageUrls(c, s.tenant_id, active.map((p) => p.id));
-  return c.json({ items: active.map((p) => productView(p, imgs)), next_cursor });
+  const avail = await availableQuantities(c.env, s.tenant_id, active.map((p) => p.id));
+  return c.json({ items: active.map((p) => productView(p, imgs, avail)), next_cursor });
 });
 
 customerApiRoutes.get("/products/:id", async (c) => {
   const s = session(c, "read");
   const p = await productsRepo.findById(getDb(c.env.DB), s.tenant_id, c.req.param("id"));
   if (!p || p.status !== "active") throw new CodedError("GH-PROD-001");
-  return c.json(productView(p, await imageUrls(c, s.tenant_id, [p.id])));
+  return c.json(productView(p, await imageUrls(c, s.tenant_id, [p.id]), await availableQuantities(c.env, s.tenant_id, [p.id])));
 });
 
 // ── Preisvorschau ────────────────────────────────────────────────────────
