@@ -1,0 +1,16 @@
+{
+  "name": "grosshandel-admin",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "start": "npm run build && python -m http.server 8082 --bind 127.0.0.1 --directory dist",
+    "build": "node build.mjs",
+    "typecheck": "tsc -p tsconfig.json",
+    "test": "node --test test.mjs",
+    "test:browser": "node smoke.mjs"
+  },
+  "devDependencies": {
+    "playwright": "^1.65.1",
+    "typescript": "~5.9.2"
+  }
+}

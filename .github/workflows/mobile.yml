@@ -29,7 +29,9 @@ jobs:
         with:
           node-version: 22
           cache: npm
-          cache-dependency-path: mobile/package-lock.json
+          cache-dependency-path: |
+            mobile/package-lock.json
+            admin/package-lock.json
 
       - name: Frontend-Plan prüfen
         run: node scripts/check-frontend-plan.mjs
@@ -43,10 +45,11 @@ jobs:
         run: npm run typecheck
 
       - name: Händler-Dashboard prüfen
-        working-directory: mobile
+        working-directory: admin
         run: |
-          npx --no-install tsc -p admin
-          node --test admin/test.mjs
+          npm ci
+          npm run typecheck
+          npm test
 
       - name: Web-Build
         working-directory: mobile
@@ -70,13 +73,14 @@ jobs:
           npm run test:browser
 
       - name: Händler-Dashboard im Browser prüfen
-        working-directory: mobile
+        working-directory: admin
         run: |
-          python3 -m http.server 8082 --bind 127.0.0.1 --directory admin &
+          npm run build
+          python3 -m http.server 8082 --bind 127.0.0.1 --directory dist &
           server_pid=$!
           trap 'kill "$server_pid" 2>/dev/null || true' EXIT
           curl -fsS --retry 10 --retry-connrefused --retry-delay 1 -o /dev/null http://127.0.0.1:8082/
-          node tests/admin-smoke.mjs
+          npm run test:browser
 
       - name: Worker-Abhängigkeiten installieren
         run: pnpm install --frozen-lockfile
